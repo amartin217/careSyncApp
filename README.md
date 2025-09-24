@@ -18,4 +18,4 @@ To get dependencies, run
 flutter pub get
 ```
 
-Once it is running locally in chrome, right click and click inspect. Then, click this button to choose the dimensions (ex iphone 14 dimensions):
+Once it is running locally in chrome, right click and click inspect. Then, click the button to the left of "elements" to choose the dimensions (ex iphone 14 dimensions).
