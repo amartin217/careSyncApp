@@ -1,7 +1,8 @@
 class Medication {
   final String id;
-  final String name;
-  final String dosage;
+  String name;
+  String dosage;
+  String notes;
   final List<String> timeslotIds;
   final Map<String, bool> isTakenByTimeslot;
 
@@ -9,6 +10,7 @@ class Medication {
     required this.id,
     required this.name,
     required this.dosage,
+    this.notes = 'N/A',
     required this.timeslotIds,
     Map<String, bool>? isTakenByTimeslot,
   }) : this.isTakenByTimeslot = isTakenByTimeslot ??
@@ -18,6 +20,7 @@ class Medication {
     String? id,
     String? name,
     String? dosage,
+    String? notes,
     List<String>? timeslotIds,
     Map<String, bool>? isTakenByTimeslot,
   }) {
@@ -25,6 +28,7 @@ class Medication {
       id: id ?? this.id,
       name: name ?? this.name,
       dosage: dosage ?? this.dosage,
+      notes: notes ?? this.notes,
       timeslotIds: timeslotIds ?? this.timeslotIds,
       isTakenByTimeslot: isTakenByTimeslot ?? this.isTakenByTimeslot,
     );

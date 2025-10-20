@@ -5,8 +5,15 @@ import 'pages/medication_page.dart';
 import 'pages/vitals_page.dart';
 import 'pages/calendar_page.dart';
 import 'pages/messaging_page.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: 'https://kslxhihlmviquoetrpjh.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtzbHhoaWhsbXZpcXVvZXRycGpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NDAxMTcsImV4cCI6MjA3NTUxNjExN30.g1yYb5JHMIvN6DHdw0WQ_TAAyWL-oEHTEPazZukoGjc',
+  );
   runApp(CaregiverSupportApp());
 }
 
