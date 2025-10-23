@@ -14,7 +14,7 @@ Future<void> main() async {
     url: 'https://kslxhihlmviquoetrpjh.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtzbHhoaWhsbXZpcXVvZXRycGpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NDAxMTcsImV4cCI6MjA3NTUxNjExN30.g1yYb5JHMIvN6DHdw0WQ_TAAyWL-oEHTEPazZukoGjc',
   );
-  runApp(CaregiverSupportApp());
+  runApp(const CaregiverSupportApp());
 }
 
 class CaregiverSupportApp extends StatelessWidget {
@@ -28,7 +28,207 @@ class CaregiverSupportApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
-      home: MainPage(),
+      home: const AuthGate(),
+    );
+  }
+}
+
+class AuthGate extends StatelessWidget {
+
+  @override
+  const AuthGate({super.key});
+  Widget build(BuildContext context) {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session != null) {
+      return const MainPage();
+    } else {
+      return const LoginPage();
+    }
+  }
+}
+
+class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+
+  String? errorMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Login')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextField(
+              controller: emailController,
+              decoration: const InputDecoration(labelText: 'Email'),
+            ),
+            TextField(
+              controller: passwordController,
+              decoration: const InputDecoration(labelText: 'Password'),
+              obscureText: true,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () async {
+                setState(() => errorMessage = null);
+                try {
+                  final res = await Supabase.instance.client.auth.signInWithPassword(
+                    email: emailController.text.trim(),
+                    password: passwordController.text.trim(),
+                  );
+                  if (res.session != null && context.mounted) {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => const MainPage()),
+                    );
+                  }
+                } on AuthException catch (e) {
+                  setState(() => errorMessage = e.message);
+                } catch (e) {
+                  setState(() => errorMessage = 'Unexpected error: $e');
+                }    
+              },
+              child: const Text('Login'),
+            ),
+            if (errorMessage != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                errorMessage!,
+                style: const TextStyle(color: Colors.red),
+                textAlign: TextAlign.center,
+              ),
+            ],
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SignUpPage()),
+                );
+              },
+              child: const Text('Create account'),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class SignUpPage extends StatefulWidget {
+  const SignUpPage({super.key});
+
+  @override
+  State<SignUpPage> createState() => _SignUpPageState();
+}
+
+class _SignUpPageState extends State<SignUpPage> {
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+  final nameController = TextEditingController();
+  bool? isPatient; // Nullable until user chooses Yes or No
+  bool isLoading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Create Account')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Full Name'),
+            ),
+            TextField(
+              controller: emailController,
+              decoration: const InputDecoration(labelText: 'Email'),
+            ),
+            TextField(
+              controller: passwordController,
+              decoration: const InputDecoration(labelText: 'Password'),
+              obscureText: true,
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Are you a patient?',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 8),
+            Column(
+              children: [
+                RadioListTile<bool>(
+                  title: const Text('Yes'),
+                  value: true,
+                  groupValue: isPatient,
+                  onChanged: (val) => setState(() => isPatient = val),
+                ),
+                RadioListTile<bool>(
+                  title: const Text('No'),
+                  value: false,
+                  groupValue: isPatient,
+                  onChanged: (val) => setState(() => isPatient = val),
+                ),
+              ],
+            ),            
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () async {
+                if (isPatient == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please select Yes or No')),
+                  );
+                  return;
+                }
+
+                try {
+                  final supabase = Supabase.instance.client;
+
+                  // 1️⃣ Create user in Auth
+                  final res = await supabase.auth.signUp(
+                    email: emailController.text.trim(),
+                    password: passwordController.text,
+                  );
+
+                  final user = res.user ?? supabase.auth.currentUser;
+                  if (user == null) throw Exception('User creation failed');
+
+                  // 2️⃣ Insert profile
+                  await supabase.from('Profile').insert({
+                    'user_id': user.id,
+                    'name': nameController.text.trim(),
+                    'is_patient': isPatient,
+                  });
+
+                  if (context.mounted) {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => const MainPage()),
+                    );
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Sign up failed: $e')),
+                  );
+                }
+              },
+              child: const Text('Sign Up'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
