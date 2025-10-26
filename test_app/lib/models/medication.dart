@@ -1,35 +1,36 @@
 class Medication {
   final String id;
-  final String name;
-  final String dosage;
-  final DateTime nextDose;
-  final bool isTaken;
-  final String frequency;
+  String name;
+  String dosage;
+  String notes;
+  final List<String> timeslotIds;
+  final Map<String, bool> isTakenByTimeslot;
 
   Medication({
     required this.id,
     required this.name,
     required this.dosage,
-    required this.nextDose,
-    this.isTaken = false,
-    this.frequency = 'Daily',
-  });
+    this.notes = 'N/A',
+    required this.timeslotIds,
+    Map<String, bool>? isTakenByTimeslot,
+  }) : this.isTakenByTimeslot = isTakenByTimeslot ??
+            {for (var tsId in timeslotIds) tsId: false};
 
   Medication copyWith({
     String? id,
     String? name,
     String? dosage,
-    DateTime? nextDose,
-    bool? isTaken,
-    String? frequency,
+    String? notes,
+    List<String>? timeslotIds,
+    Map<String, bool>? isTakenByTimeslot,
   }) {
     return Medication(
       id: id ?? this.id,
       name: name ?? this.name,
       dosage: dosage ?? this.dosage,
-      nextDose: nextDose ?? this.nextDose,
-      isTaken: isTaken ?? this.isTaken,
-      frequency: frequency ?? this.frequency,
+      notes: notes ?? this.notes,
+      timeslotIds: timeslotIds ?? this.timeslotIds,
+      isTakenByTimeslot: isTakenByTimeslot ?? this.isTakenByTimeslot,
     );
   }
 }
