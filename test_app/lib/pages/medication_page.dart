@@ -46,12 +46,17 @@ class _MedicationPageState extends State<MedicationPage> {
     });
   }
 
-  void _editMedication(String id, String name, String dosage, String notes) {
+  void _editMedication(String id, String name, String dosage, String notes, List<Timeslot> tempSelectedSlots) {
     setState(() {
       Medication med = medications.singleWhere((m) => m.id == id);
       med.name = name;
       med.dosage = dosage;
       med.notes = notes;
+      List<String> timeslotIdArray = [];
+      for (Timeslot s in tempSelectedSlots) {
+        timeslotIdArray.add(s.id);
+      }
+      med.timeslotIds = timeslotIdArray;
     });
   }
   
@@ -346,7 +351,7 @@ class MyMedicationsScreen extends StatefulWidget {
   final List<Medication> medications;
   final void Function(String id) deleteMedication;
   final void Function(Medication med) addMedication;
-  final void Function(String id, String name, String dosage, String notes) editMedication;
+  final void Function(String id, String name, String dosage, String notes, List<Timeslot> tempSelectedSlots) editMedication;
   final List<Timeslot> timeslots;
 
   MyMedicationsScreen({
@@ -388,7 +393,7 @@ class _MyMedicationsScreenState extends State<MyMedicationsScreen> {
                       child: Text("Details"),
                     ),
                     TextButton(
-                      child: Text("Edit Medication"),
+                      child: Text("Edit"),
                       onPressed: () {
                         showDialog(
                           context: context,
@@ -396,25 +401,37 @@ class _MyMedicationsScreenState extends State<MyMedicationsScreen> {
                             String name = m.name;
                             String dosage = m.dosage;
                             String notes = m.notes;
-                            List<Timeslot> tempSelectedSlots = [...selectedSlots];
-
+                            List<Timeslot> tempSelectedSlots = widget.timeslots.where((slot) => m.timeslotIds.contains(slot.id)).toList();
                             return StatefulBuilder(
                               builder: (context, setStateDialog) {
+                                    // Initialize TextEditingControllers with existing values
+                                    final TextEditingController nameController =
+                                        TextEditingController(text: m.name);
+                                    final TextEditingController dosageController =
+                                        TextEditingController(text: m.dosage);
+                                    final TextEditingController notesController =
+                                        TextEditingController(text: m.notes);
+
+                                    // // Temporary selected slots (copy of current assigned slots)
+                                    // List<String> tempSelectedSlotIds = List.from(m.timeslotIds);
                                 return AlertDialog(
-                                  title: Text("Edit Medication"),
+                                  title: const Text("Edit"),
                                   content: SingleChildScrollView(
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         TextField(
+                                          controller: nameController,
                                           decoration: InputDecoration(labelText: "Name"),
                                           onChanged: (val) => name = val,
                                         ),
                                         TextField(
+                                          controller: dosageController,
                                           decoration: InputDecoration(labelText: "Dosage"),
                                           onChanged: (val) => dosage = val,
                                         ),
                                         TextField(
+                                          controller: notesController,
                                           decoration: InputDecoration(labelText: "Notes"),
                                           onChanged: (val) => notes = val,
                                         ),
@@ -459,10 +476,12 @@ class _MyMedicationsScreenState extends State<MyMedicationsScreen> {
                                         child: Text("Cancel")),
                                     ElevatedButton(
                                       onPressed: () {
-                                        if (name.isNotEmpty &&
-                                            dosage.isNotEmpty &&
+                                        final updatedName = nameController.text.trim();
+                                        final updatedDosage = dosageController.text.trim();
+                                        final updatedNotes = notesController.text.trim();
+                                        if (updatedName.isNotEmpty &&
                                             tempSelectedSlots.isNotEmpty) {
-                                          widget.editMedication(m.id, name, dosage, notes);
+                                          widget.editMedication(m.id, updatedName, updatedDosage, updatedNotes, tempSelectedSlots);
                                           Navigator.pop(context);
                                           setState(() {
                                             selectedSlots = [];
