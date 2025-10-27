@@ -1,6 +1,6 @@
 class Timeslot {
-  final String label;
   final String id;
+  String label;
 
   Timeslot({required this.label, required this.id});
 }
