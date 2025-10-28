@@ -244,6 +244,7 @@ List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
               setState(() {
                 selectedDate = selectedDate.subtract(Duration(days: 7)); // Go back one week
                 _loadAppointments();
+                _loadAppointmentsForWeek(selectedDate);
               });
             },
             icon: Icon(Icons.chevron_left),
@@ -265,6 +266,7 @@ List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
               setState(() {
                 selectedDate = selectedDate.add(Duration(days: 7)); // Go forward one week
                 _loadAppointments();
+                _loadAppointmentsForWeek(selectedDate);
               });
             },
             icon: Icon(Icons.chevron_right),
@@ -316,6 +318,7 @@ List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
                       setState(() {
                         selectedDate = currentDate;
                         _loadAppointments();
+                        _loadAppointmentsForWeek(selectedDate);
                       });
                     },
                     child: Container(
