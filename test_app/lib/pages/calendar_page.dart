@@ -63,7 +63,6 @@ class _CalendarPageState extends State<CalendarPage> {
       caregiverId: '3', // Emily Chen
       duration: Duration(hours: 2),
       status: AppointmentStatus.scheduled,
-      priority: Priority.high,
     ),
     CaregiverAppointment(
       id: '2',
@@ -73,7 +72,6 @@ class _CalendarPageState extends State<CalendarPage> {
       caregiverId: '2', // Mike Rodriguez
       duration: Duration(hours: 1),
       status: AppointmentStatus.scheduled,
-      priority: Priority.medium,
     ),
     CaregiverAppointment(
       id: '3',
@@ -83,7 +81,7 @@ class _CalendarPageState extends State<CalendarPage> {
       caregiverId: '4', // Dr. Williams
       duration: Duration(minutes: 45),
       status: AppointmentStatus.scheduled,
-      priority: Priority.high,
+
     ),
     CaregiverAppointment(
       id: '4',
@@ -93,7 +91,7 @@ class _CalendarPageState extends State<CalendarPage> {
       caregiverId: '1', // Sarah Johnson
       duration: Duration(minutes: 30),
       status: AppointmentStatus.scheduled,
-      priority: Priority.high,
+
     ),
     CaregiverAppointment(
       id: '5',
@@ -103,10 +101,17 @@ class _CalendarPageState extends State<CalendarPage> {
       caregiverId: '3', // Emily Chen
       duration: Duration(hours: 1, minutes: 30),
       status: AppointmentStatus.completed,
-      priority: Priority.medium,
+
     ),
   ];
 
+  void _addEvent(CaregiverAppointment event) {
+      setState(() {
+        appointments.add(event);
+      });
+    }
+  
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -118,10 +123,6 @@ class _CalendarPageState extends State<CalendarPage> {
           IconButton(
             icon: Icon(Icons.people),
             onPressed: _showCaregiversDialog,
-          ),
-          IconButton(
-            icon: Icon(Icons.add),
-            onPressed: _showAddAppointmentDialog,
           ),
         ],
       ),
@@ -135,6 +136,15 @@ class _CalendarPageState extends State<CalendarPage> {
           ),
         ],
       ),
+
+
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddAppointmentDialog,
+        child: Icon(Icons.add),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat, // ⬅ bottom-right
+
+
     );
   }
 
@@ -375,161 +385,123 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Widget _buildAppointmentCard(CaregiverAppointment appointment, Caregiver? caregiver) {
-    return Card(
-      margin: EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: caregiver?.color ?? Colors.grey,
-                  child: Text(
-                    caregiver?.avatar ?? '?',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+  final bool isCompleted = appointment.status == AppointmentStatus.completed;
+
+  return Card(
+    margin: EdgeInsets.only(bottom: 12),
+    color: isCompleted ? Colors.grey.shade300 : Colors.white, // ✅ Background change
+    child: Padding(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: caregiver?.color ?? Colors.grey,
+                child: Text(
+                  caregiver?.avatar ?? '?',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        appointment.title,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          decoration: appointment.status == AppointmentStatus.completed 
-                              ? TextDecoration.lineThrough 
-                              : TextDecoration.none,
-                        ),
-                      ),
-                      Text(
-                        caregiver?.name ?? 'Unknown Caregiver',
-                        style: TextStyle(
-                          color: caregiver?.color ?? Colors.grey,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _formatTime(appointment.dateTime),
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                      appointment.title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        decoration: isCompleted
+                            ? TextDecoration.lineThrough
+                            : TextDecoration.none,
+                        color: isCompleted
+                            ? Colors.grey.shade700 // ✅ Dimmed when completed (optional)
+                            : Colors.black,
+                      ),
                     ),
                     Text(
-                      '${appointment.duration.inHours}h ${appointment.duration.inMinutes % 60}m',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      caregiver?.name ?? 'Unknown Caregiver',
+                      style: TextStyle(
+                        color: caregiver?.color ?? Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
-                SizedBox(width: 8),
-                _buildPriorityIndicator(appointment.priority),
-              ],
-            ),
-            if (appointment.description.isNotEmpty) ...[
-              SizedBox(height: 8),
-              Text(
-                appointment.description,
-                style: TextStyle(color: Colors.grey[600]),
               ),
-            ],
-            SizedBox(height: 12),
-            Row(
-              children: [
-                _buildStatusChip(appointment.status),
-                Spacer(),
-                if (appointment.status == AppointmentStatus.scheduled)
-                  Row(
-                    children: [
-                      TextButton.icon(
-                        onPressed: () => _callCaregiver(caregiver),
-                        icon: Icon(Icons.phone, size: 16),
-                        label: Text('Call'),
-                      ),
-                      SizedBox(width: 8),
-                      ElevatedButton(
-                        onPressed: () => _markAsCompleted(appointment),
-                        child: Text('Complete'),
-                      ),
-                    ],
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    _formatTime(appointment.dateTime),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: isCompleted
+                          ? Colors.grey.shade700 // ✅ Optional dimming
+                          : Colors.black,
+                    ),
                   ),
-              ],
+                ],
+              ),
+              SizedBox(width: 8),
+            ],
+          ),
+          if (appointment.description.isNotEmpty) ...[
+            SizedBox(height: 8),
+            Text(
+              appointment.description,
+              style: TextStyle(
+                color: isCompleted
+                    ? Colors.grey.shade700 // ✅ Optional dimming
+                    : Colors.grey[600],
+              ),
             ),
           ],
-        ),
+          SizedBox(height: 12),
+          Row(
+            children: [
+              Spacer(),
+              Row(
+                children: [
+                  SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () => _toggleCompletion(appointment),
+                    icon: Icon(
+                      isCompleted
+                          ? Icons.check_box
+                          : Icons.check_box_outline_blank,
+                    ),
+                    label: Text(
+                      isCompleted ? 'Uncomplete' : 'Complete',
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () => _showEditAppointmentDialog(appointment),
+                    child: Text('Edit'),
+                  ),
+                  SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () => _showDeleteAppointmentDialog(appointment),
+                    child: Text('Delete'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildStatusChip(AppointmentStatus status) {
-    Color color;
-    String text;
-    
-    switch (status) {
-      case AppointmentStatus.scheduled:
-        color = Colors.blue;
-        text = 'Scheduled';
-        break;
-      case AppointmentStatus.inProgress:
-        color = Colors.orange;
-        text = 'In Progress';
-        break;
-      case AppointmentStatus.completed:
-        color = Colors.green;
-        text = 'Completed';
-        break;
-      case AppointmentStatus.cancelled:
-        color = Colors.red;
-        text = 'Cancelled';
-        break;
-    }
-
-    return Chip(
-      label: Text(
-        text,
-        style: TextStyle(color: Colors.white, fontSize: 12),
-      ),
-      backgroundColor: color,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    );
-  }
-
-  Widget _buildPriorityIndicator(Priority priority) {
-    Color color;
-    IconData icon;
-    
-    switch (priority) {
-      case Priority.low:
-        color = Colors.green;
-        icon = Icons.keyboard_arrow_down;
-        break;
-      case Priority.medium:
-        color = Colors.orange;
-        icon = Icons.remove;
-        break;
-      case Priority.high:
-        color = Colors.red;
-        icon = Icons.keyboard_arrow_up;
-        break;
-    }
-
-    return Container(
-      padding: EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Icon(icon, color: color, size: 16),
-    );
-  }
 
   // Helper methods
   bool _isSameDay(DateTime date1, DateTime date2) {
@@ -580,42 +552,18 @@ class _CalendarPageState extends State<CalendarPage> {
     }
   }
 
-  void _markAsCompleted(CaregiverAppointment appointment) {
-    setState(() {
-      final index = appointments.indexWhere((apt) => apt.id == appointment.id);
-      if (index != -1) {
-        appointments[index] = appointment.copyWith(status: AppointmentStatus.completed);
-      }
-    });
-  }
-
-  void _callCaregiver(Caregiver? caregiver) {
-    if (caregiver != null) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text('Call ${caregiver.name}'),
-          content: Text('Would you like to call ${caregiver.phone}?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Here you would integrate with phone dialer
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Calling ${caregiver.name}...')),
-                );
-              },
-              child: Text('Call'),
-            ),
-          ],
-        ),
+  void _toggleCompletion(CaregiverAppointment appointment) {
+  setState(() {
+    final index = appointments.indexWhere((apt) => apt.id == appointment.id);
+    if (index != -1) {
+      final isCompleted = appointments[index].status == AppointmentStatus.completed;
+      appointments[index] = appointment.copyWith(
+        status: isCompleted ? AppointmentStatus.scheduled : AppointmentStatus.completed,
       );
     }
-  }
+    // updateAppointmentBackend(appointments[index]);
+  });
+}
 
   void _showCaregiversDialog() {
     showDialog(
@@ -636,10 +584,6 @@ class _CalendarPageState extends State<CalendarPage> {
                 ),
                 title: Text(caregiver.name),
                 subtitle: Text(caregiver.role),
-                trailing: IconButton(
-                  icon: Icon(Icons.phone),
-                  onPressed: () => _callCaregiver(caregiver),
-                ),
               );
             },
           ),
@@ -655,8 +599,303 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   void _showAddAppointmentDialog() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Add appointment feature coming soon!')),
+      final _titleController = TextEditingController();
+      final _descriptionController = TextEditingController();
+      // Caregiver? selectedCaregiver = caregivers.first;
+      Caregiver? selectedCaregiver = caregivers.isNotEmpty ? caregivers.first : null;
+      if (selectedCaregiver == null) 
+      {
+        print("Error: cannot create new event because this patient has no caregivers.");
+        return;
+      }
+      // DateTime selectedDate = DateTime.now();       // default date
+      DateTime selectedDateOnly = selectedDate;
+      TimeOfDay? selectedTime;                      // must pick time
+      Duration selectedDuration = const Duration(hours: 1);
+
+      showDialog(
+        context: context,
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (context, setModalState) {
+              return AlertDialog(
+                title: const Text('Add Appointment'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: _titleController,
+                        decoration: const InputDecoration(labelText: 'Title'),
+                      ),
+                      TextField(
+                        controller: _descriptionController,
+                        decoration: const InputDecoration(labelText: 'Description'),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<Caregiver>(
+                        value: selectedCaregiver,
+                        items: caregivers
+                            .map((c) => DropdownMenuItem(
+                                  value: c,
+                                  child: Text(c.name),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          setModalState(() {
+                            selectedCaregiver = value!;
+                          });
+                        },
+                        decoration: const InputDecoration(labelText: 'Assign to'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: () async {
+                          final pickedDate = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2100),
+                          );
+                          if (pickedDate != null) {
+                            setModalState(() {
+                              selectedDate = pickedDate;
+                            });
+                          }
+                        },
+                        child: Text(
+                          'Pick Date: ${selectedDate.toLocal().toString().split(' ')[0]}',
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          final pickedTime = await showTimePicker(
+                            context: context,
+                            initialTime: selectedTime ?? TimeOfDay.now(),
+                          );
+                          if (pickedTime != null) {
+                            setModalState(() {
+                              selectedTime = pickedTime;
+                            });
+                          }
+                        },
+                        child: Text(
+                          selectedTime == null
+                              ? 'Pick Time'
+                              : 'Time: ${selectedTime!.format(context)}',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      if (_titleController.text.trim().isEmpty) return;
+
+                      if (selectedTime == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Please select a time')),
+                        );
+                        return;
+                      }
+
+                      final finalDateTime = DateTime(
+                        selectedDate.year,
+                        selectedDate.month,
+                        selectedDate.day,
+                        selectedTime!.hour,
+                        selectedTime!.minute,
+                      );
+
+                      final newEvent = CaregiverAppointment(
+                        id: DateTime.now().millisecondsSinceEpoch.toString(),
+                        title: _titleController.text.trim(),
+                        description: _descriptionController.text.trim(),
+                        caregiverId: selectedCaregiver!.id,
+                        dateTime: finalDateTime,
+                        duration: selectedDuration,
+                        status: AppointmentStatus.scheduled,
+                        // priority: Priority.medium,
+                      );
+
+                      // 1️⃣ Update local state immediately
+                      _addEvent(newEvent);
+
+                      // 2️⃣ Call backend and handle errors
+                      try {
+                        // await addAppointmentToBackend(newEvent);
+                        Navigator.of(context).pop(); // only close if successful
+                      } catch (e) {
+                        // Roll back local state if needed
+                        setState(() {
+                          appointments.removeWhere((a) => a.id == newEvent.id);
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to add appointment: $e')),
+                        );
+                      }
+                    },
+                    child: const Text('Add'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    }
+
+  void _showEditAppointmentDialog(CaregiverAppointment appointment) {
+    final _titleController = TextEditingController(text: appointment.title);
+    final _descriptionController = TextEditingController(text: appointment.description);
+    Caregiver? selectedCaregiver = _getCaregiverById(appointment.caregiverId);
+    DateTime selectedDateTime = appointment.dateTime;
+    Duration selectedDuration = appointment.duration;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return AlertDialog(
+              title: const Text('Edit Appointment'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: _titleController,
+                      decoration: const InputDecoration(labelText: 'Title'),
+                    ),
+                    TextField(
+                      controller: _descriptionController,
+                      decoration: const InputDecoration(labelText: 'Description'),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<Caregiver>(
+                      value: selectedCaregiver,
+                      items: caregivers
+                          .map((c) => DropdownMenuItem(
+                                value: c,
+                                child: Text(c.name),
+                              ))
+                          .toList(),
+                      onChanged: (value) {
+                        setModalState(() {
+                          selectedCaregiver = value!;
+                        });
+                      },
+                      decoration: const InputDecoration(labelText: 'Assign to'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () async {
+                        final pickedDate = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDateTime,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2100),
+                        );
+                        if (pickedDate != null) {
+                          final pickedTime = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.fromDateTime(selectedDateTime),
+                          );
+                          if (pickedTime != null) {
+                            setModalState(() {
+                              selectedDateTime = DateTime(
+                                pickedDate.year,
+                                pickedDate.month,
+                                pickedDate.day,
+                                pickedTime.hour,
+                                pickedTime.minute,
+                              );
+                            });
+                          }
+                        }
+                      },
+                      child: Text(
+                        'Pick Date & Time: ${selectedDateTime.toString().substring(0, 16)}',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (_titleController.text.trim().isEmpty) return;
+
+                    // Update the appointment
+                    setState(() {
+                      final index = appointments.indexWhere((a) => a.id == appointment.id);
+                      appointments[index] = appointment.copyWith(
+                        title: _titleController.text.trim(),
+                        description: _descriptionController.text.trim(),
+                        caregiverId: selectedCaregiver!.id,
+                        dateTime: selectedDateTime,
+                        duration: selectedDuration,
+                      );
+                    });
+
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
+
+  void _deleteAppointment(CaregiverAppointment appointment, BuildContext dialogContext) async {
+      try {
+        // await deleteAppointmentBackend(appointment.id); // backend call
+        setState(() {
+          appointments.removeWhere((a) => a.id == appointment.id);
+        });
+        Navigator.of(dialogContext).pop(); // pop dialog
+      } catch (e) {
+        // handle error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete appointment: $e')),
+        );
+      }
+    }
+
+  void _showDeleteAppointmentDialog(CaregiverAppointment appointment) {
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Delete Appointment'),
+            content: Text(
+              'Are you sure you want to delete "${appointment.title}" from the schedule?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+
+              ElevatedButton(
+              onPressed: () => _deleteAppointment(appointment, context),
+              child: Text('Delete'),
+            ),
+            ],
+          );
+        },
+      );
+    }
 }
