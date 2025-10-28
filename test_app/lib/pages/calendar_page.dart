@@ -17,57 +17,7 @@ class _CalendarPageState extends State<CalendarPage> {
   DateTime selectedDate = DateTime.now();
   
   List<Caregiver> caregivers = [];
-  // Sample appointments assigned to caregivers
-  List<CaregiverAppointment> appointments = [
-    CaregiverAppointment(
-      id: '1',
-      title: 'Morning Care Routine',
-      description: 'Help with bathing, dressing, and breakfast',
-      dateTime: DateTime.now().add(Duration(hours: 1)),
-      caregiverId: '3', // Emily Chen
-      duration: Duration(hours: 2),
-      status: AppointmentStatus.scheduled,
-    ),
-    CaregiverAppointment(
-      id: '2',
-      title: 'Physical Therapy Session',
-      description: 'Leg strengthening exercises and mobility work',
-      dateTime: DateTime.now().add(Duration(days: 1, hours: 14)),
-      caregiverId: '2', // Mike Rodriguez
-      duration: Duration(hours: 1),
-      status: AppointmentStatus.scheduled,
-    ),
-    CaregiverAppointment(
-      id: '3',
-      title: 'Medical Checkup',
-      description: 'Monthly health assessment and medication review',
-      dateTime: DateTime.now().add(Duration(days: 2, hours: 10)),
-      caregiverId: '4', // Dr. Williams
-      duration: Duration(minutes: 45),
-      status: AppointmentStatus.scheduled,
-
-    ),
-    CaregiverAppointment(
-      id: '4',
-      title: 'Wound Care',
-      description: 'Daily wound dressing change and assessment',
-      dateTime: DateTime.now().add(Duration(hours: 8)),
-      caregiverId: '1', // Sarah Johnson
-      duration: Duration(minutes: 30),
-      status: AppointmentStatus.scheduled,
-
-    ),
-    CaregiverAppointment(
-      id: '5',
-      title: 'Evening Care',
-      description: 'Dinner assistance and bedtime routine',
-      dateTime: DateTime.now().add(Duration(hours: 12)),
-      caregiverId: '3', // Emily Chen
-      duration: Duration(hours: 1, minutes: 30),
-      status: AppointmentStatus.completed,
-
-    ),
-  ];
+  List<CaregiverAppointment> appointments = [];
 
   void _addEvent(CaregiverAppointment event) {
       setState(() {
@@ -78,8 +28,8 @@ class _CalendarPageState extends State<CalendarPage> {
   @override
   void initState() {
     super.initState();
-    // _loadAppointments(); // Safe to call here because Supabase is already initialized
     _loadCaregivers();
+    _loadAppointments(); // Safe to call here because Supabase is already initialized
   }
   
 Future<List<Caregiver>> fetchCaregivers(bool isPatient) async {
@@ -141,7 +91,47 @@ Future<void> _loadCaregivers() async {
   });
 }
 
+Future<List<CaregiverAppointment>> fetchAppointments(DateTime date) async {
+  final supabase = Supabase.instance.client;
+  final currentUser = supabase.auth.currentUser;
+  if (currentUser == null) {
+    throw Exception('User not logged in — cannot fetch appointments.');
+  }
+  final startOfDay = DateTime(date.year, date.month, date.day);
+  final endOfDay = startOfDay.add(const Duration(days: 1));
 
+  try {
+    final response = await supabase
+        .from('Event')
+        .select()
+        .gte('start_datetime', startOfDay.toIso8601String())
+        .lt('start_datetime', endOfDay.toIso8601String());
+
+    if (response == null || response.isEmpty) {
+      print('No appointments found for ${date.toIso8601String()}');
+      return [];
+    }
+    print('✅ Fetched ${response.length} appointments');
+
+    return (response as List<dynamic>)
+        .map<CaregiverAppointment>((e) => CaregiverAppointment.fromJson(e))
+        .toList();
+  } catch (error) {
+    print('❌ Failed to fetch appointments: $error');
+    rethrow;
+  }
+}
+
+void _loadAppointments() async {
+  try {
+    final fetched = await fetchAppointments(selectedDate);
+    setState(() {
+      appointments = fetched;
+    });
+  } catch (e) {
+    print(e);
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -197,6 +187,7 @@ Future<void> _loadCaregivers() async {
             onPressed: () {
               setState(() {
                 selectedDate = selectedDate.subtract(Duration(days: 7)); // Go back one week
+                _loadAppointments();
               });
             },
             icon: Icon(Icons.chevron_left),
@@ -217,6 +208,7 @@ Future<void> _loadCaregivers() async {
             onPressed: () {
               setState(() {
                 selectedDate = selectedDate.add(Duration(days: 7)); // Go forward one week
+                _loadAppointments();
               });
             },
             icon: Icon(Icons.chevron_right),
@@ -267,6 +259,7 @@ Future<void> _loadCaregivers() async {
                     onTap: () {
                       setState(() {
                         selectedDate = currentDate;
+                        _loadAppointments();
                       });
                     },
                     child: Container(
