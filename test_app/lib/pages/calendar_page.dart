@@ -28,9 +28,11 @@ class _CalendarPageState extends State<CalendarPage> {
   @override
   void initState() {
     super.initState();
+    _loadAppointmentsForWeek(DateTime.now());
     _loadCaregivers();
     _loadAppointments(); // Safe to call here because Supabase is already initialized
   }
+
   
 Future<List<Caregiver>> fetchCaregivers(bool isPatient) async {
   final supabase = Supabase.instance.client;
@@ -132,6 +134,60 @@ void _loadAppointments() async {
     print(e);
   }
 }
+
+Future<List<CaregiverAppointment>> fetchAppointmentsForWeek(DateTime startOfWeek) async {
+  final supabase = Supabase.instance.client;
+  final currentUser = supabase.auth.currentUser;
+  if (currentUser == null) {
+    throw Exception('User not logged in — cannot fetch appointments.');
+  }
+  final endOfWeek = startOfWeek.add(Duration(days: 7));
+
+  try {
+    final response = await supabase
+        .from('Event')
+        .select()
+        .gte('start_datetime', startOfWeek.toIso8601String())
+        .lt('start_datetime', endOfWeek.toIso8601String());
+
+    if (response == null || response.isEmpty) {
+      return [];
+    }
+
+    return (response as List<dynamic>)
+        .map<CaregiverAppointment>((e) => CaregiverAppointment.fromJson(e))
+        .toList();
+  } catch (e) {
+    print('Failed to fetch appointments for week: $e');
+    return [];
+  }
+}
+
+Map<DateTime, List<CaregiverAppointment>> groupedAppointments = {};
+
+void _loadAppointmentsForWeek(DateTime referenceDate) async {
+  final startOfWeek = referenceDate.subtract(Duration(days: referenceDate.weekday % 7));
+  final weekAppointments = await fetchAppointmentsForWeek(startOfWeek);
+
+
+  final Map<DateTime, List<CaregiverAppointment>> grouped = {};
+  for (var appt in weekAppointments) {
+    final dateKey = DateTime(appt.dateTime.year, appt.dateTime.month, appt.dateTime.day);
+    grouped.putIfAbsent(dateKey, () => []).add(appt);
+  }
+
+  setState(() {
+    groupedAppointments = grouped;
+    selectedDate = referenceDate; // optional, keep currently selected day
+  });
+}
+
+List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
+  final dateKey = DateTime(date.year, date.month, date.day);
+  return groupedAppointments[dateKey] ?? [];
+}
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -564,9 +620,9 @@ void _loadAppointments() async {
     return '$hour:$minute $period';
   }
 
-  List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
-    return appointments.where((appointment) => _isSameDay(appointment.dateTime, date)).toList();
-  }
+  // List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
+  //   return appointments.where((appointment) => _isSameDay(appointment.dateTime, date)).toList();
+  // }
 
   Caregiver? _getCaregiverById(String id) {
     try {
@@ -744,7 +800,6 @@ void _loadAppointments() async {
                         dateTime: finalDateTime,
                         duration: selectedDuration,
                         status: AppointmentStatus.scheduled,
-                        // priority: Priority.medium,
                       );
 
                       // 1️⃣ Update local state immediately
