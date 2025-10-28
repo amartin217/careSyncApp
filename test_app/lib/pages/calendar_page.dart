@@ -2,6 +2,9 @@
 import 'package:flutter/material.dart';
 import '../models/appointment.dart';
 import '../models/caregiver.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+final supabase = Supabase.instance.client;
 
 class CalendarPage extends StatefulWidget {
   const CalendarPage({super.key});
@@ -13,46 +16,7 @@ class CalendarPage extends StatefulWidget {
 class _CalendarPageState extends State<CalendarPage> {
   DateTime selectedDate = DateTime.now();
   
-  // Sample caregivers
-  List<Caregiver> caregivers = [
-    Caregiver(
-      id: '1',
-      name: 'Sarah Johnson',
-      role: 'Primary Nurse',
-      phone: '(555) 123-4567',
-      email: 'sarah.j@caregiving.com',
-      color: Colors.blue,
-      avatar: 'SJ',
-    ),
-    Caregiver(
-      id: '2',
-      name: 'Mike Rodriguez',
-      role: 'Physical Therapist',
-      phone: '(555) 234-5678',
-      email: 'mike.r@therapy.com',
-      color: Colors.green,
-      avatar: 'MR',
-    ),
-    Caregiver(
-      id: '3',
-      name: 'Emily Chen',
-      role: 'Home Health Aide',
-      phone: '(555) 345-6789',
-      email: 'emily.c@homecare.com',
-      color: Colors.purple,
-      avatar: 'EC',
-    ),
-    Caregiver(
-      id: '4',
-      name: 'Dr. Williams',
-      role: 'Primary Physician',
-      phone: '(555) 456-7890',
-      email: 'dr.williams@clinic.com',
-      color: Colors.orange,
-      avatar: 'DW',
-    ),
-  ];
-
+  List<Caregiver> caregivers = [];
   // Sample appointments assigned to caregivers
   List<CaregiverAppointment> appointments = [
     CaregiverAppointment(
@@ -111,7 +75,74 @@ class _CalendarPageState extends State<CalendarPage> {
       });
     }
   
+  @override
+  void initState() {
+    super.initState();
+    // _loadAppointments(); // Safe to call here because Supabase is already initialized
+    _loadCaregivers();
+  }
   
+Future<List<Caregiver>> fetchCaregivers(bool isPatient) async {
+  final supabase = Supabase.instance.client;
+  final currentUser = supabase.auth.currentUser!;
+  
+  List<Map<String, dynamic>> response;
+  print("isPatient: $isPatient");
+  if (isPatient) {
+    // If current user is a patient, fetch caregivers linked to them
+    response = await supabase
+        .from('CareRelation')
+        .select('user_id')
+        .eq('patient_id', currentUser.id);
+  } else {
+    // If current user is a caregiver, first fetch their patient_id
+    final relation = await supabase
+        .from('CareRelation')
+        .select('patient_id')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+
+    if (relation == null) {
+      response = [];
+    } else {
+      final patientId = relation['patient_id'];
+      response = await supabase
+          .from('CareRelation')
+          .select('user_id, profile:user_id (name)')
+          .eq('patient_id', patientId);
+    }
+  }
+  print("number of caregivers: ${response.length}");
+
+  final formatted_caregivers = response.map((row) => Caregiver(
+    id: row['user_id'],
+    name: row['profile']?['name'] ?? '',
+    color: Colors.blue,
+  )).toList();
+  return formatted_caregivers;
+}
+
+Future<void> _loadCaregivers() async {
+  final currentUser = Supabase.instance.client.auth.currentUser!;
+  final profile = await Supabase.instance.client
+      .from('Profile')
+      .select('is_patient')
+      .eq('user_id', currentUser.id)
+      .maybeSingle();
+
+  final isPatient = profile?['is_patient'] ?? false;
+
+  List<Caregiver> fetchedCaregivers = await fetchCaregivers(isPatient);
+  final names = caregivers.map((c) => c.name).join(', ');
+  print("Caregiver names: $names");
+
+  setState(() {
+    caregivers = fetchedCaregivers;
+  });
+}
+
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -400,13 +431,13 @@ class _CalendarPageState extends State<CalendarPage> {
               CircleAvatar(
                 radius: 20,
                 backgroundColor: caregiver?.color ?? Colors.grey,
-                child: Text(
-                  caregiver?.avatar ?? '?',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                // child: Text(
+                  // caregiver?.avatar ?? '?',
+                  // style: TextStyle(
+                  //   color: Colors.white,
+                  //   fontWeight: FontWeight.bold,
+                  // ),
+                // ),
               ),
               SizedBox(width: 12),
               Expanded(
@@ -580,10 +611,10 @@ class _CalendarPageState extends State<CalendarPage> {
               return ListTile(
                 leading: CircleAvatar(
                   backgroundColor: caregiver.color,
-                  child: Text(caregiver.avatar, style: TextStyle(color: Colors.white)),
+                  // child: Text(caregiver.avatar, style: TextStyle(color: Colors.white)),
                 ),
                 title: Text(caregiver.name),
-                subtitle: Text(caregiver.role),
+                // subtitle: Text(caregiver.role),
               );
             },
           ),
