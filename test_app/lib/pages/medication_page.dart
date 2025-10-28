@@ -97,12 +97,16 @@ class _MedicationPageState extends State<MedicationPage> {
     });
   }
 
-  void _editTimeslot(String id, String label, List<Medication> selectedMeds) {
+  void _editTimeslot(String id, String label, List<Medication> selectedMeds, List<Medication> allMeds) {
         setState(() {
       Timeslot slot = timeslots.singleWhere((s) => s.id == id);
       slot.label = label;
-      for (Medication m in selectedMeds) {
-        m.timeslotIds.add(slot.id);
+      for (Medication m in allMeds) {
+        if (selectedMeds.contains(m) && !m.timeslotIds.contains(slot.id)) {
+          m.timeslotIds.add(slot.id);
+        } else if (!selectedMeds.contains(m) && m.timeslotIds.contains(slot.id)) {
+          m.timeslotIds.remove(slot.id);
+        }
       }
     });
   }
@@ -152,7 +156,7 @@ class MedicationTimelineScreen extends StatelessWidget {
   final void Function(String medId, String timeslotId) toggleTaken;
   final void Function(Timeslot slot, List<Medication> selectedMeds) addTimeslot;
   final void Function(String timeslotId) deleteTimeslot; 
-  final void Function(String id, String label, List<Medication> selectedMeds) editTimeslot;
+  final void Function(String id, String label, List<Medication> selectedMeds, List<Medication> allMeds) editTimeslot;
 
   MedicationTimelineScreen({
     required this.medications,
@@ -178,6 +182,7 @@ class MedicationTimelineScreen extends StatelessWidget {
             toggleTaken: toggleTaken,
             deleteTimeslot: deleteTimeslot,
             editTimeslot: editTimeslot,
+            medicationTimelineScreenPointer: this,
           );
         }),
         SizedBox(height: 12),
@@ -284,7 +289,8 @@ class TimeslotCard extends StatelessWidget {
   final List<Timeslot> timeslots;
   final void Function(String medId, String timeslotId) toggleTaken;
   final void Function(String timeslotId) deleteTimeslot;
-  final void Function(String id, String label, List<Medication> selectedMeds) editTimeslot;
+  final void Function(String id, String label, List<Medication> selectedMeds, List<Medication> allMeds) editTimeslot;
+  final MedicationTimelineScreen medicationTimelineScreenPointer;
   
 
   TimeslotCard({
@@ -294,6 +300,7 @@ class TimeslotCard extends StatelessWidget {
     required this.toggleTaken,
     required this.deleteTimeslot,
     required this.editTimeslot,
+    required this.medicationTimelineScreenPointer,
   });
 
   @override
@@ -306,116 +313,119 @@ class TimeslotCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(slot.label),
-            IconButton(
-              icon: Icon(Icons.edit, color: Colors.blue),
-              onPressed: () {
-                String editedLabel = slot.label; // prefill existing label
-                List<Medication> selectedMeds = [];
-                for (Medication med in meds) {
-                  if (med.timeslotIds.contains(slot.id)) {
-                    selectedMeds.add(med);
-                  }
-                } // clone existing meds
-
-                showDialog(
-                  context: context,
-                  builder: (context) {
-                    return StatefulBuilder(
-                      builder: (context, setStateDialog) {
-                        return AlertDialog(
-                          title: Text("Edit Timeslot"),
-                          content: SingleChildScrollView(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                TextField(
-                                  decoration: InputDecoration(labelText: "Timeslot Name"),
-                                  controller: TextEditingController(text: editedLabel),
-                                  onChanged: (val) => editedLabel = val,
+            Row(
+              children: [
+                IconButton(
+                  icon: Icon(Icons.edit, color: Colors.blue),
+                  onPressed: () {
+                    String editedLabel = slot.label; // prefill existing label
+                    List<Medication> selectedMeds = [];
+                    for (Medication med in meds) {
+                      if (med.timeslotIds.contains(slot.id)) {
+                        selectedMeds.add(med);
+                      }
+                    } // clone existing meds
+                    showDialog(
+                      context: context,
+                      builder: (context) {
+                        return StatefulBuilder(
+                          builder: (context, setStateDialog) {
+                            return AlertDialog(
+                              title: Text("Edit Timeslot"),
+                              content: SingleChildScrollView(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    TextField(
+                                      decoration: InputDecoration(labelText: "Timeslot Name"),
+                                      controller: TextEditingController(text: editedLabel),
+                                      onChanged: (val) => editedLabel = val,
+                                    ),
+                                    SizedBox(height: 12),
+                                    Text("Assigned Medications:"),
+                                    Wrap(
+                                      spacing: 6,
+                                      children: medicationTimelineScreenPointer.medications.map((m) {
+                                        final isSelected = selectedMeds.contains(m);
+                                        return FilterChip(
+                                          label: Text(
+                                            m.name,
+                                            style: TextStyle(
+                                              color: isSelected ? Colors.white : Colors.black,
+                                            ),
+                                          ),
+                                          selected: isSelected,
+                                          selectedColor: Colors.blue,
+                                          backgroundColor: Colors.grey.shade300,
+                                          side: BorderSide(
+                                            color: isSelected ? Colors.blue : Colors.grey,
+                                          ),
+                                          showCheckmark: false,
+                                          onSelected: (selected) {
+                                            setStateDialog(() {
+                                              if (selected) {
+                                                selectedMeds.add(m);
+                                              } else {
+                                                selectedMeds.remove(m);
+                                              }
+                                            });
+                                          },
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ],
                                 ),
-                                SizedBox(height: 12),
-                                Text("Assigned Medications:"),
-                                Wrap(
-                                  spacing: 6,
-                                  children: meds.map((m) {
-                                    final isSelected = selectedMeds.contains(m);
-                                    return FilterChip(
-                                      label: Text(
-                                        m.name,
-                                        style: TextStyle(
-                                          color: isSelected ? Colors.white : Colors.black,
-                                        ),
-                                      ),
-                                      selected: isSelected,
-                                      selectedColor: Colors.blue,
-                                      backgroundColor: Colors.grey.shade300,
-                                      side: BorderSide(
-                                        color: isSelected ? Colors.blue : Colors.grey,
-                                      ),
-                                      showCheckmark: false,
-                                      onSelected: (selected) {
-                                        setStateDialog(() {
-                                          if (selected) {
-                                            selectedMeds.add(m);
-                                          } else {
-                                            selectedMeds.remove(m);
-                                          }
-                                        });
-                                      },
-                                    );
-                                  }).toList(),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: Text("Cancel"),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    if (editedLabel.isNotEmpty) {
+                                      editTimeslot(slot.id, editedLabel, selectedMeds, medicationTimelineScreenPointer.medications);
+                                      Navigator.pop(context);
+                                    }
+                                  },
+                                  child: Text("Save Changes"),
                                 ),
                               ],
-                            ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: Text("Cancel"),
-                            ),
-                            ElevatedButton(
-                              onPressed: () {
-                                if (editedLabel.isNotEmpty) {
-                                  editTimeslot(slot.id, editedLabel, selectedMeds); // your custom update logic
-                                  Navigator.pop(context);
-                                }
-                              },
-                              child: Text("Save Changes"),
-                            ),
-                          ],
+                            );
+                          },
                         );
                       },
                     );
                   },
-                );
-              },
-            ),
-            IconButton(
-              icon: Icon(Icons.delete, color: Colors.red),
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: Text("Delete Timeslot"),
-                    content:
-                        Text("Are you sure you want to delete '${slot.label}'?"),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: Text("Cancel"),
+                ),
+                IconButton(
+                  icon: Icon(Icons.delete, color: Colors.red),
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: Text("Delete Timeslot"),
+                        content:
+                            Text("Are you sure you want to delete '${slot.label}'?"),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: Text("Cancel"),
+                          ),
+                          ElevatedButton(
+                            onPressed: () {
+                              deleteTimeslot(slot.id);
+                              Navigator.pop(ctx);
+                            },
+                            child: Text("Delete"),
+                          ),
+                        ],
                       ),
-                      ElevatedButton(
-                        onPressed: () {
-                          deleteTimeslot(slot.id);
-                          Navigator.pop(ctx);
-                        },
-                        child: Text("Delete"),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
+                    );
+                  },
+                ),
+              ]
+            )
           ],
         ),
         children: meds
@@ -499,9 +509,9 @@ class _MyMedicationsScreenState extends State<MyMedicationsScreen> {
                         showDialog(
                           context: context,
                           builder: (context) {
-                            String name = m.name;
-                            String dosage = m.dosage;
-                            String notes = m.notes;
+                            // String name = m.name;
+                            // String dosage = m.dosage;
+                            // String notes = m.notes;
                             List<Timeslot> tempSelectedSlots = widget.timeslots.where((slot) => m.timeslotIds.contains(slot.id)).toList();
                             return StatefulBuilder(
                               builder: (context, setStateDialog) {
@@ -524,17 +534,17 @@ class _MyMedicationsScreenState extends State<MyMedicationsScreen> {
                                         TextField(
                                           controller: nameController,
                                           decoration: InputDecoration(labelText: "Name"),
-                                          onChanged: (val) => name = val,
+                                          onChanged: (val) => m.name = val,
                                         ),
                                         TextField(
                                           controller: dosageController,
                                           decoration: InputDecoration(labelText: "Dosage"),
-                                          onChanged: (val) => dosage = val,
+                                          onChanged: (val) => m.dosage = val,
                                         ),
                                         TextField(
                                           controller: notesController,
                                           decoration: InputDecoration(labelText: "Notes"),
-                                          onChanged: (val) => notes = val,
+                                          onChanged: (val) => m.notes = val,
                                         ),
                                         SizedBox(height: 12),
                                         Text("Assign to Timeslots:"),
