@@ -7,6 +7,8 @@ import 'pages/calendar_page.dart';
 import 'pages/messaging_page.dart';
 import 'pages/link_patient_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
+import 'pages/user_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,7 +17,13 @@ Future<void> main() async {
     url: 'https://kslxhihlmviquoetrpjh.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtzbHhoaWhsbXZpcXVvZXRycGpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NDAxMTcsImV4cCI6MjA3NTUxNjExN30.g1yYb5JHMIvN6DHdw0WQ_TAAyWL-oEHTEPazZukoGjc',
   );
-  runApp(const CaregiverSupportApp());
+  // runApp(const CaregiverSupportApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => UserProvider()..loadUser(), // load user once at start
+      child: const CaregiverSupportApp(),
+    ),
+  );
 }
 
 class CaregiverSupportApp extends StatelessWidget {
