@@ -33,7 +33,12 @@ class _CalendarPageState extends State<CalendarPage> {
     _loadAppointments(); // Safe to call here because Supabase is already initialized
   }
 
-  
+
+/* ########################################
+ * Load + fetch appointments 
+ * ########################################
+ */
+
 Future<List<Caregiver>> fetchCaregivers(bool isPatient) async {
   final supabase = Supabase.instance.client;
   final currentUser = supabase.auth.currentUser!;
@@ -124,16 +129,18 @@ Future<List<CaregiverAppointment>> fetchAppointments(DateTime date) async {
   }
 }
 
-void _loadAppointments() async {
+
+Future<void> _loadAppointments() async {
   try {
     final fetched = await fetchAppointments(selectedDate);
     setState(() {
       appointments = fetched;
     });
   } catch (e) {
-    print(e);
+    print('❌ Failed to load appointments: $e');
   }
 }
+
 
 Future<List<CaregiverAppointment>> fetchAppointmentsForWeek(DateTime startOfWeek) async {
   final supabase = Supabase.instance.client;
@@ -141,14 +148,20 @@ Future<List<CaregiverAppointment>> fetchAppointmentsForWeek(DateTime startOfWeek
   if (currentUser == null) {
     throw Exception('User not logged in — cannot fetch appointments.');
   }
-  final endOfWeek = startOfWeek.add(Duration(days: 7));
+  // final endOfWeek = startOfWeek.add(Duration(days: 7));
+   // Truncate startOfWeek to midnight
+  final start = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+  // End of week = 7 days later, also at midnight (exclusive)
+  final end = start.add(const Duration(days: 7));
 
   try {
     final response = await supabase
         .from('Event')
         .select()
-        .gte('start_datetime', startOfWeek.toIso8601String())
-        .lt('start_datetime', endOfWeek.toIso8601String());
+        // .gte('start_datetime', startOfWeek.toIso8601String())
+        // .lt('start_datetime', endOfWeek.toIso8601String());
+        .gte('start_datetime', start.toIso8601String())
+        .lt('start_datetime', end.toIso8601String());
 
     if (response == null || response.isEmpty) {
       return [];
@@ -165,7 +178,7 @@ Future<List<CaregiverAppointment>> fetchAppointmentsForWeek(DateTime startOfWeek
 
 Map<DateTime, List<CaregiverAppointment>> groupedAppointments = {};
 
-void _loadAppointmentsForWeek(DateTime referenceDate) async {
+Future<void> _loadAppointmentsForWeek(DateTime referenceDate) async {
   final startOfWeek = referenceDate.subtract(Duration(days: referenceDate.weekday % 7));
   final weekAppointments = await fetchAppointmentsForWeek(startOfWeek);
 
@@ -187,8 +200,83 @@ List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
   return groupedAppointments[dateKey] ?? [];
 }
 
+/* ######################################
+ * Link to backend
+ * ######################################
+ */
+
+Future<void> addAppointmentToBackend(CaregiverAppointment appointment) async {
+  final supabase = Supabase.instance.client;
+  final currentUser = supabase.auth.currentUser;
+
+  if (currentUser == null) {
+    throw Exception('User not logged in — cannot add appointment.');
+  }
+
+  try {
+    // 1️⃣ Check user role
+    final roleRes = await supabase
+        .from('Profile')
+        .select('is_patient')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+
+    if (roleRes == null) {
+      throw Exception('No profile found for current user.');
+    }
+    if (roleRes['is_patient'] == true)
+    {
+      throw Exception('Patients cannot create appointments.');
+    }
+
+    // 2️⃣ Get the caregiver's assigned patient
+    final assignment = await supabase
+        .from('CareRelation')
+        .select('patient_id')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+
+    if (assignment == null || assignment['patient_id'] == null) {
+      throw Exception('No assigned patient found for this caregiver.');
+    }
+
+    final patientId = assignment['patient_id'] as String;
+
+    // 3️⃣ Insert appointment
+    final response = await supabase
+        .from('Event')
+        .insert({
+          'patient_id': patientId,
+          'assigned_user': appointment.caregiverId,
+          'name': appointment.title,
+          'description': appointment.description,
+          'start_datetime': appointment.dateTime.toIso8601String(),
+          'end_datetime': appointment.dateTime
+              .add(appointment.duration)
+              .toIso8601String(),
+          'is_completed': appointment.status == 'completed',
+        })
+        .select()
+        .maybeSingle();
+
+    if (response == null) {
+      throw Exception('Insert failed — Supabase returned null.');
+    }
+
+    print('✅ Appointment created: ${response['event_id']}');
+  } catch (error) {
+    print('❌ Failed to add appointment: $error');
+    rethrow;
+  }
+}
 
 
+
+
+/* ######################################
+ * Widgets
+ * ######################################
+ */
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -228,7 +316,7 @@ List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
   Widget _buildWeeklyCalendarHeader() {
     // Get the start and end of the current week
     final startOfWeek = selectedDate.subtract(Duration(days: selectedDate.weekday % 7));
-    final endOfWeek = startOfWeek.add(Duration(days: 6));
+    final endOfWeek = startOfWeek.add(Duration(days: 7));
     
     return Container(
       padding: EdgeInsets.all(16),
@@ -293,7 +381,7 @@ List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
                           day,
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.grey[600],
+                            color: Colors.blue[600],
                           ),
                         ),
                       ),
@@ -364,7 +452,7 @@ List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
                                           width: 8,
                                           height: 8,
                                           decoration: BoxDecoration(
-                                            color: _getCaregiverById(apt.caregiverId)?.color ?? Colors.grey,
+                                            color: _getCaregiverById(apt.caregiverId)?.color ?? Colors.blue,
                                             shape: BoxShape.circle,
                                           ),
                                         ))
@@ -457,7 +545,15 @@ List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
                     itemCount: dayAppointments.length,
                     itemBuilder: (context, index) {
                       final appointment = dayAppointments[index];
-                      final caregiver = _getCaregiverById(appointment.caregiverId);
+                      // final caregiver = _getCaregiverById(appointment.caregiverId);
+                      final caregiver = caregivers.firstWhere(
+                        (c) => c.id == appointment.caregiverId,
+                        orElse: () => Caregiver(
+                        id: '',
+                        name: 'Unknown',
+                        color: Colors.grey,
+                      ),
+                      );
                       return _buildAppointmentCard(appointment, caregiver);
                     },
                   ),
@@ -482,7 +578,7 @@ List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundColor: caregiver?.color ?? Colors.grey,
+                backgroundColor: caregiver?.color ?? Colors.blue,
                 // child: Text(
                   // caregiver?.avatar ?? '?',
                   // style: TextStyle(
@@ -623,17 +719,18 @@ List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
     return '$hour:$minute $period';
   }
 
-  // List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
-  //   return appointments.where((appointment) => _isSameDay(appointment.dateTime, date)).toList();
-  // }
 
-  Caregiver? _getCaregiverById(String id) {
-    try {
-      return caregivers.firstWhere((caregiver) => caregiver.id == id);
-    } catch (e) {
-      return null;
-    }
+  Caregiver? _getCaregiverById(String caregiverId) {
+  try {
+    return caregivers.firstWhere(
+      (c) => c.id == caregiverId,
+    );
+  } catch (e) {
+    // No caregiver found with that ID
+    return null;
   }
+}
+
 
   void _toggleCompletion(CaregiverAppointment appointment) {
   setState(() {
@@ -691,8 +788,6 @@ List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
         print("Error: cannot create new event because this patient has no caregivers.");
         return;
       }
-      // DateTime selectedDate = DateTime.now();       // default date
-      DateTime selectedDateOnly = selectedDate;
       TimeOfDay? selectedTime;                      // must pick time
       Duration selectedDuration = const Duration(hours: 1);
 
@@ -810,7 +905,9 @@ List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
 
                       // 2️⃣ Call backend and handle errors
                       try {
-                        // await addAppointmentToBackend(newEvent);
+                        await addAppointmentToBackend(newEvent);
+                        await _loadAppointmentsForWeek(selectedDate); 
+                        await _loadAppointments(); // refresh appointments list or calendar
                         Navigator.of(context).pop(); // only close if successful
                       } catch (e) {
                         // Roll back local state if needed
@@ -835,7 +932,16 @@ List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
   void _showEditAppointmentDialog(CaregiverAppointment appointment) {
     final _titleController = TextEditingController(text: appointment.title);
     final _descriptionController = TextEditingController(text: appointment.description);
-    Caregiver? selectedCaregiver = _getCaregiverById(appointment.caregiverId);
+    // Caregiver? selectedCaregiver = _getCaregiverById(appointment.caregiverId);
+    Caregiver? selectedCaregiver = caregivers.firstWhere(
+      (c) => c.id == appointment.caregiverId,
+      orElse: () => Caregiver(
+        id: '',
+        name: 'Unknown',
+        color: Colors.grey,
+      ),
+    );
+
     DateTime selectedDateTime = appointment.dateTime;
     Duration selectedDuration = appointment.duration;
 
