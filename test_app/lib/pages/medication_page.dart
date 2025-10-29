@@ -16,9 +16,9 @@ class _MedicationPageState extends State<MedicationPage> {
   ];
 
   List<Timeslot> timeslots = [
-    Timeslot(label: "Morning Medications", id: '0'),
-    Timeslot(label: "Afternoon Medications", id: '1'),
-    Timeslot(label: "Evening Medications", id: '2'),
+    Timeslot(label: "Morning Medications", id: '0', time: const TimeOfDay(hour:8, minute:0)),
+    Timeslot(label: "Afternoon Medications", id: '1', time: const TimeOfDay(hour:14, minute:0)),
+    Timeslot(label: "Evening Medications", id: '2', time: const TimeOfDay(hour:20, minute:0)),
   ];
 
   void _toggleTaken(String medId, String timeslotId) {
@@ -46,7 +46,7 @@ class _MedicationPageState extends State<MedicationPage> {
     });
   }
 
-  void _editMedication(String id, String name, String dosage, String notes, List<Timeslot> tempSelectedSlots) {
+void _editMedication(String id, String name, String dosage, String notes, List<Timeslot> tempSelectedSlots) {
     setState(() {
       Medication med = medications.singleWhere((m) => m.id == id);
       med.name = name;
@@ -156,7 +156,7 @@ class MedicationTimelineScreen extends StatelessWidget {
   final void Function(String medId, String timeslotId) toggleTaken;
   final void Function(Timeslot slot, List<Medication> selectedMeds) addTimeslot;
   final void Function(String timeslotId) deleteTimeslot; 
-  final void Function(String id, String label, List<Medication> selectedMeds, List<Medication> allMeds) editTimeslot;
+   final void Function(String id, String label, List<Medication> selectedMeds, List<Medication> allMeds) editTimeslot;
 
   MedicationTimelineScreen({
     required this.medications,
@@ -172,116 +172,169 @@ class MedicationTimelineScreen extends StatelessWidget {
     return ListView(
       padding: EdgeInsets.all(16),
       children: [
-        ...timeslots.map((slot) {
-          final slotMeds =
-              medications.where((m) => m.timeslotIds.contains(slot.id)).toList();
-          return TimeslotCard(
-            slot: slot,
-            meds: slotMeds,
-            timeslots: timeslots,
-            toggleTaken: toggleTaken,
-            deleteTimeslot: deleteTimeslot,
-            editTimeslot: editTimeslot,
-            medicationTimelineScreenPointer: this,
-          );
-        }),
+  ...(
+    timeslots.toList()
+      ..sort((a, b) {
+        final aMinutes = a.time.hour * 60 + a.time.minute;
+        final bMinutes = b.time.hour * 60 + b.time.minute;
+        return aMinutes.compareTo(bMinutes);
+      })
+  ).map((slot) {
+    final slotMeds = medications
+        .where((m) => m.timeslotIds.contains(slot.id))
+        .toList();
+
+    return TimeslotCard(
+      slot: slot,
+      meds: slotMeds,
+      timeslots: timeslots,
+      toggleTaken: toggleTaken,
+      deleteTimeslot: deleteTimeslot,
+      editTimeslot: editTimeslot,
+      medicationTimelineScreenPointer: this,
+    );
+  }).toList(),
+
         SizedBox(height: 12),
         ElevatedButton(
-          child: Text("+ Add Timeslot"),
-          onPressed: () {
-            String newLabel = "";
-            List<Medication> selectedMeds = [];
-
-            showDialog(
-              context: context,
-              builder: (context) {
-                return StatefulBuilder(
-                  builder: (context, setStateDialog) {
-                    return AlertDialog(
-                      title: Text("Add Timeslot"),
-                      content: SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            TextField(
-                              decoration: InputDecoration(labelText: "Timeslot Name"),
-                              onChanged: (val) => newLabel = val,
-                            ),
-                            SizedBox(height: 12),
-                            Text("Assign to Medications:"),
-                            Wrap(
-                              spacing: 6,
-                              children: medications.map((m) {
-                                final isSelected = selectedMeds.contains(m);
-                                return FilterChip(
-                                  label: Text(
-                                    m.name,
-                                    style: TextStyle(
-                                      color: isSelected ? Colors.white : Colors.black,
-                                    ),
-                                  ),
-                                  selected: isSelected,
-                                  selectedColor: Colors.blue,
-                                  backgroundColor: Colors.grey.shade300,
-                                  side: BorderSide(
-                                    color: isSelected ? Colors.blue : Colors.grey,
-                                  ),
-                                  showCheckmark: false,
-                                  onSelected: (selected) {
-                                    setStateDialog(() {
-                                      if (selected) {
-                                        selectedMeds.add(m);
-                                      } else {
-                                        selectedMeds.remove(m);
-                                      }
-                                    });
-                                  },
-                                );
-                              }).toList(),
-                            ),
-                          ],
+        child: Text("+ Add Timeslot"),
+        onPressed: () {
+          String newLabel = "";
+          TimeOfDay selectedTime = TimeOfDay.now();
+          List<Medication> selectedMeds = [];
+          showDialog(
+            context: context,
+            builder: (context) {
+              return StatefulBuilder(
+                builder: (context, setStateDialog) {
+                  return AlertDialog(
+                    title: Text("Add Timeslot"),
+                    content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Name input field
+                        TextField(
+                          decoration: const InputDecoration(
+                            labelText: "Timeslot Name",
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (val) => newLabel = val,
                         ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: Text("Cancel"),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            if (newLabel.isNotEmpty) {
-                              final newSlot = Timeslot(
-                                label: newLabel,
-                                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                              );
+                        const SizedBox(height: 16),
 
-                              addTimeslot(newSlot, selectedMeds);
-                              Navigator.pop(context);
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                      "Added '${newSlot.label}' and assigned ${selectedMeds.length} medications."),
-                                ),
-                              );
+                        // Time picker field
+                        GestureDetector(
+                          onTap: () async {
+                            final TimeOfDay? picked = await showTimePicker(
+                              context: context,
+                              initialTime: selectedTime,
+                              initialEntryMode: TimePickerEntryMode.input,
+                            );
+                            if (picked != null) {
+                              setStateDialog(() {
+                                selectedTime = picked;
+                              });
                             }
                           },
-                          child: Text("Save"),
+                          child: AbsorbPointer(
+                            child: TextField(
+                              decoration: const InputDecoration(
+                                labelText: "Timeslot Time",
+                                border: OutlineInputBorder(),
+                                suffixIcon: Icon(Icons.access_time),
+                              ),
+                              controller: TextEditingController(
+                                text: selectedTime.format(context),
+                              ),
+                              readOnly: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Medication chips
+                        const Text(
+                          "Assign to Medications:",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: medications.map((m) {
+                            final isSelected = selectedMeds.contains(m);
+                            return FilterChip(
+                              label: Text(
+                                m.name,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.black,
+                                ),
+                              ),
+                              selected: isSelected,
+                              selectedColor: Colors.blue,
+                              backgroundColor: Colors.grey.shade300,
+                              side: BorderSide(
+                                color: isSelected ? Colors.blue : Colors.grey,
+                              ),
+                              showCheckmark: false,
+                              onSelected: (selected) {
+                                setStateDialog(() {
+                                  if (selected) {
+                                    selectedMeds.add(m);
+                                  } else {
+                                    selectedMeds.remove(m);
+                                  }
+                                });
+                              },
+                            );
+                          }).toList(),
                         ),
                       ],
-                    );
-                  },
-                );
-              },
-            );
-          },
-        ),
+                    ),
+                  ),
+
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text("Cancel"),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          if (newLabel.isNotEmpty) {
+                            final newSlot = Timeslot(
+                              label: newLabel,
+                              id: DateTime.now().millisecondsSinceEpoch.toString(),
+                              time: selectedTime,
+                            );
+
+                            addTimeslot(newSlot, selectedMeds);
+                            Navigator.pop(context);
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  "Added '${newSlot.label}' at '${newSlot.time.format(context)}' and assigned ${selectedMeds.length} medications.",
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        child: Text("Save"),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
       ],
     );
   }
 }
-
-
 
 class TimeslotCard extends StatelessWidget {
   final Timeslot slot;
@@ -291,7 +344,7 @@ class TimeslotCard extends StatelessWidget {
   final void Function(String timeslotId) deleteTimeslot;
   final void Function(String id, String label, List<Medication> selectedMeds, List<Medication> allMeds) editTimeslot;
   final MedicationTimelineScreen medicationTimelineScreenPointer;
-  
+
 
   TimeslotCard({
     required this.slot,
@@ -306,59 +359,125 @@ class TimeslotCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 16),
       child: ExpansionTile(
+        key: PageStorageKey(slot.id),
+        maintainState: true,
         initiallyExpanded: true,
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(slot.label),
+            // left side: name + time
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  slot.label,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  slot.time.format(context),
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+            // right side: icons
             Row(
               children: [
                 IconButton(
-                  icon: Icon(Icons.edit, color: Colors.blue),
+                  icon: const Icon(Icons.edit, color: Colors.blue),
                   onPressed: () {
-                    String editedLabel = slot.label; // prefill existing label
+                    // existing edit dialog logic here
+                    String editedLabel = slot.label;
+                    TimeOfDay editedTime = slot.time;
                     List<Medication> selectedMeds = [];
                     for (Medication med in meds) {
                       if (med.timeslotIds.contains(slot.id)) {
                         selectedMeds.add(med);
                       }
-                    } // clone existing meds
+                    }
                     showDialog(
                       context: context,
                       builder: (context) {
                         return StatefulBuilder(
                           builder: (context, setStateDialog) {
                             return AlertDialog(
-                              title: Text("Edit Timeslot"),
+                              title: const Text("Edit Timeslot"),
                               content: SingleChildScrollView(
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     TextField(
-                                      decoration: InputDecoration(labelText: "Timeslot Name"),
-                                      controller: TextEditingController(text: editedLabel),
+                                      decoration: const InputDecoration(
+                                        labelText: "Timeslot Name",
+                                      ),
+                                      controller: TextEditingController(
+                                          text: editedLabel),
                                       onChanged: (val) => editedLabel = val,
                                     ),
-                                    SizedBox(height: 12),
-                                    Text("Assigned Medications:"),
+                                    const SizedBox(height: 16),
+                                    GestureDetector(
+                                      onTap: () async {
+                                        final TimeOfDay? picked =
+                                            await showTimePicker(
+                                          context: context,
+                                          initialTime: editedTime,
+                                          initialEntryMode:
+                                              TimePickerEntryMode.input,
+                                        );
+                                        if (picked != null) {
+                                          setStateDialog(() {
+                                            editedTime = picked;
+                                          });
+                                        }
+                                      },
+                                      child: AbsorbPointer(
+                                        child: TextField(
+                                          decoration: const InputDecoration(
+                                            labelText: "Timeslot Time",
+                                            border: OutlineInputBorder(),
+                                            suffixIcon:
+                                                Icon(Icons.access_time),
+                                          ),
+                                          controller: TextEditingController(
+                                            text: editedTime.format(context),
+                                          ),
+                                          readOnly: true,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 20),
+                                    const Text("Assigned Medications:"),
                                     Wrap(
                                       spacing: 6,
-                                      children: medicationTimelineScreenPointer.medications.map((m) {
-                                        final isSelected = selectedMeds.contains(m);
+                                      children: medicationTimelineScreenPointer
+                                          .medications
+                                          .map((m) {
+                                        final isSelected =
+                                            selectedMeds.contains(m);
                                         return FilterChip(
                                           label: Text(
                                             m.name,
                                             style: TextStyle(
-                                              color: isSelected ? Colors.white : Colors.black,
+                                              color: isSelected
+                                                  ? Colors.white
+                                                  : Colors.black,
                                             ),
                                           ),
                                           selected: isSelected,
                                           selectedColor: Colors.blue,
-                                          backgroundColor: Colors.grey.shade300,
+                                          backgroundColor:
+                                              Colors.grey.shade300,
                                           side: BorderSide(
-                                            color: isSelected ? Colors.blue : Colors.grey,
+                                            color: isSelected
+                                                ? Colors.blue
+                                                : Colors.grey,
                                           ),
                                           showCheckmark: false,
                                           onSelected: (selected) {
@@ -378,17 +497,24 @@ class TimeslotCard extends StatelessWidget {
                               ),
                               actions: [
                                 TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: Text("Cancel"),
+                                  onPressed: () =>
+                                      Navigator.pop(context),
+                                  child: const Text("Cancel"),
                                 ),
                                 ElevatedButton(
                                   onPressed: () {
                                     if (editedLabel.isNotEmpty) {
-                                      editTimeslot(slot.id, editedLabel, selectedMeds, medicationTimelineScreenPointer.medications);
+                                      editTimeslot(
+                                        slot.id,
+                                        editedLabel,
+                                        selectedMeds,
+                                        medicationTimelineScreenPointer
+                                            .medications,
+                                      );
                                       Navigator.pop(context);
                                     }
                                   },
-                                  child: Text("Save Changes"),
+                                  child: const Text("Save Changes"),
                                 ),
                               ],
                             );
@@ -399,42 +525,43 @@ class TimeslotCard extends StatelessWidget {
                   },
                 ),
                 IconButton(
-                  icon: Icon(Icons.delete, color: Colors.red),
+                  icon: const Icon(Icons.delete, color: Colors.red),
                   onPressed: () {
                     showDialog(
                       context: context,
                       builder: (ctx) => AlertDialog(
-                        title: Text("Delete Timeslot"),
-                        content:
-                            Text("Are you sure you want to delete '${slot.label}'?"),
+                        title: const Text("Delete Timeslot"),
+                        content: Text(
+                            "Are you sure you want to delete '${slot.label}'?"),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(ctx),
-                            child: Text("Cancel"),
+                            child: const Text("Cancel"),
                           ),
                           ElevatedButton(
                             onPressed: () {
                               deleteTimeslot(slot.id);
                               Navigator.pop(ctx);
                             },
-                            child: Text("Delete"),
+                            child: const Text("Delete"),
                           ),
                         ],
                       ),
                     );
                   },
                 ),
-              ]
-            )
+              ],
+            ),
           ],
         ),
         children: meds
             .map((m) => CheckboxListTile(
-                  title: Text("${m.name} ${m.dosage} \n Notes: ${m.notes}" ),
+                  title:
+                      Text("${m.name}- ${m.dosage}\nNotes: ${m.notes}"),
                   value: m.isTakenByTimeslot[slot.id] ?? false,
                   onChanged: (_) => toggleTaken(m.id, slot.id),
                   secondary: TextButton(
-                    child: Text("Details"),
+                    child: const Text("Details"),
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -449,11 +576,10 @@ class TimeslotCard extends StatelessWidget {
                   ),
                 ))
             .toList(),
-      ),
+      )
     );
   }
 }
-
 
 /// ---------------------
 /// My Medications View
@@ -462,7 +588,7 @@ class MyMedicationsScreen extends StatefulWidget {
   final List<Medication> medications;
   final void Function(String id) deleteMedication;
   final void Function(Medication med) addMedication;
-  final void Function(String id, String name, String dosage, String notes, List<Timeslot> tempSelectedSlots) editMedication;
+final void Function(String id, String name, String dosage, String notes, List<Timeslot> tempSelectedSlots) editMedication;
   final List<Timeslot> timeslots;
 
   MyMedicationsScreen({
@@ -509,24 +635,22 @@ class _MyMedicationsScreenState extends State<MyMedicationsScreen> {
                         showDialog(
                           context: context,
                           builder: (context) {
-                            // String name = m.name;
-                            // String dosage = m.dosage;
-                            // String notes = m.notes;
-                            List<Timeslot> tempSelectedSlots = widget.timeslots.where((slot) => m.timeslotIds.contains(slot.id)).toList();
+                            String name = m.name;
+                            String dosage = m.dosage;
+                            String notes = m.notes;
+                            List<Timeslot> tempSelectedSlots = [...selectedSlots];
+
                             return StatefulBuilder(
                               builder: (context, setStateDialog) {
-                                    // Initialize TextEditingControllers with existing values
+                                 // Initialize TextEditingControllers with existing values
                                     final TextEditingController nameController =
                                         TextEditingController(text: m.name);
                                     final TextEditingController dosageController =
                                         TextEditingController(text: m.dosage);
                                     final TextEditingController notesController =
                                         TextEditingController(text: m.notes);
-
-                                    // // Temporary selected slots (copy of current assigned slots)
-                                    // List<String> tempSelectedSlotIds = List.from(m.timeslotIds);
                                 return AlertDialog(
-                                  title: const Text("Edit"),
+                                 title: const Text("Edit"),
                                   content: SingleChildScrollView(
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
@@ -554,7 +678,7 @@ class _MyMedicationsScreenState extends State<MyMedicationsScreen> {
                                             final isSelected = tempSelectedSlots.contains(slot);
                                             return FilterChip(
                                               label: Text(
-                                                slot.label,
+                                                slot.label + slot.time.format(context),
                                                 style: TextStyle(
                                                   color: isSelected ? Colors.white : Colors.black,
                                                 ),
@@ -776,10 +900,11 @@ class MedicationDetailPage extends StatelessWidget {
                   children: med.timeslotIds.map((id) {
                     final ts = timeslots.firstWhere(
                       (t) => t.id == id,
-                      orElse: () => Timeslot(id: id, label: "Unknown"),
+                      orElse: () => Timeslot(id: id, label: "Unknown", time: TimeOfDay.now()),
                     );
                     final taken = med.isTakenByTimeslot[id] ?? false;
-                    return Text("${ts.label} — Taken: ${taken ? "Yes" : "No"}");
+                    String formattedTime = MaterialLocalizations.of(context).formatTimeOfDay(ts.time);
+                    return Text("${ts.label}($formattedTime) — Taken: ${taken ? "Yes" : "No"}");
                   }).toList(),
                 ),
               ),
