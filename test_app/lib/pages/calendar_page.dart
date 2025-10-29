@@ -129,7 +129,6 @@ Future<List<CaregiverAppointment>> fetchAppointments(DateTime date) async {
   }
 }
 
-
 Future<void> _loadAppointments() async {
   try {
     final fetched = await fetchAppointments(selectedDate);
@@ -140,7 +139,6 @@ Future<void> _loadAppointments() async {
     print('❌ Failed to load appointments: $e');
   }
 }
-
 
 Future<List<CaregiverAppointment>> fetchAppointmentsForWeek(DateTime startOfWeek) async {
   final supabase = Supabase.instance.client;
@@ -204,7 +202,7 @@ List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
  * Link to backend
  * ######################################
  */
-
+// ---------------- Add Appointment ----------------
 Future<void> addAppointmentToBackend(CaregiverAppointment appointment) async {
   final supabase = Supabase.instance.client;
   final currentUser = supabase.auth.currentUser;
@@ -270,7 +268,76 @@ Future<void> addAppointmentToBackend(CaregiverAppointment appointment) async {
   }
 }
 
+// ---------------- Update Appointment ----------------
+Future<void> updateAppointmentBackend(CaregiverAppointment appointment) async {
+  final supabase = Supabase.instance.client;
+  final currentUser = supabase.auth.currentUser;
 
+  if (currentUser == null) {
+    throw Exception('User not logged in — cannot update appointment.');
+  }
+
+  // 1️⃣ Check role
+  final roleRes = await supabase
+      .from('Profile')
+      .select('is_patient')
+      .eq('user_id', currentUser.id)
+      .maybeSingle();
+
+  if (roleRes == null) {
+    throw Exception('No profile found for current user.');
+  }
+  if (roleRes['is_patient'] == true) {
+    throw Exception('Patients cannot update appointments.');
+  }
+
+  try {
+    final response = await supabase
+        .from('Event')
+        .update({
+          'name': appointment.title,
+          'description': appointment.description,
+          'start_datetime': appointment.dateTime.toIso8601String(),
+          'end_datetime': appointment.dateTime.add(appointment.duration).toIso8601String(),
+          'assigned_user': appointment.caregiverId,
+          'is_completed': appointment.status == AppointmentStatus.completed,
+        })
+        .eq('event_id', appointment.id)
+        .select()
+        .maybeSingle();
+
+    if (response == null) {
+      throw Exception('Update failed — Supabase returned null.');
+    }
+
+    print('✅ Appointment updated: ${appointment.id}');
+  } catch (e) {
+    print('❌ Failed to update appointment: $e');
+    rethrow;
+  }
+}
+
+// ---------------- Delete Appointment ----------------
+Future<void> deleteAppointmentBackend(String id) async {
+  final supabase = Supabase.instance.client;
+
+  try {
+    final response = await supabase
+        .from('Event')
+        .delete()
+        .eq('event_id', id)
+        .select(); // optional: returns deleted row(s)
+
+    if (response == null) {
+      throw Exception('Delete failed — no rows returned.');
+    }
+
+    print('✅ Appointment deleted: $id');
+  } catch (e) {
+    print('❌ Failed to delete appointment: $e');
+    rethrow;
+  }
+}
 
 
 /* ######################################
@@ -719,7 +786,6 @@ Future<void> addAppointmentToBackend(CaregiverAppointment appointment) async {
     return '$hour:$minute $period';
   }
 
-
   Caregiver? _getCaregiverById(String caregiverId) {
   try {
     return caregivers.firstWhere(
@@ -731,18 +797,34 @@ Future<void> addAppointmentToBackend(CaregiverAppointment appointment) async {
   }
 }
 
+  void _toggleCompletion(CaregiverAppointment appointment) async {
+  final index = appointments.indexWhere((apt) => apt.id == appointment.id);
+  if (index == -1) return;
 
-  void _toggleCompletion(CaregiverAppointment appointment) {
+  final isCompleted = appointment.status == AppointmentStatus.completed;
+  final updatedAppointment = appointment.copyWith(
+    status: isCompleted ? AppointmentStatus.scheduled : AppointmentStatus.completed,
+  );
+
+  // Optimistic update: update local state first
   setState(() {
-    final index = appointments.indexWhere((apt) => apt.id == appointment.id);
-    if (index != -1) {
-      final isCompleted = appointments[index].status == AppointmentStatus.completed;
-      appointments[index] = appointment.copyWith(
-        status: isCompleted ? AppointmentStatus.scheduled : AppointmentStatus.completed,
-      );
-    }
-    // updateAppointmentBackend(appointments[index]);
+    appointments[index] = updatedAppointment;
   });
+
+  try {
+    // Update backend
+    await updateAppointmentBackend(updatedAppointment);
+    // Optional: reload weekly appointments to refresh calendar bubbles
+    await _loadAppointmentsForWeek(updatedAppointment.dateTime);
+  } catch (e) {
+    // Roll back if backend update fails
+    setState(() {
+      appointments[index] = appointment;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to update appointment: $e')),
+    );
+  }
 }
 
   void _showCaregiversDialog() {
@@ -930,160 +1012,190 @@ Future<void> addAppointmentToBackend(CaregiverAppointment appointment) async {
     }
 
   void _showEditAppointmentDialog(CaregiverAppointment appointment) {
-    final _titleController = TextEditingController(text: appointment.title);
-    final _descriptionController = TextEditingController(text: appointment.description);
-    // Caregiver? selectedCaregiver = _getCaregiverById(appointment.caregiverId);
-    Caregiver? selectedCaregiver = caregivers.firstWhere(
-      (c) => c.id == appointment.caregiverId,
-      orElse: () => Caregiver(
-        id: '',
-        name: 'Unknown',
-        color: Colors.grey,
-      ),
-    );
+  final _titleController = TextEditingController(text: appointment.title);
+  final _descriptionController = TextEditingController(text: appointment.description);
 
-    DateTime selectedDateTime = appointment.dateTime;
-    Duration selectedDuration = appointment.duration;
+  Caregiver? selectedCaregiver = caregivers.firstWhere(
+    (c) => c.id == appointment.caregiverId,
+    orElse: () => Caregiver(
+      id: '',
+      name: 'Unknown',
+      color: Colors.grey,
+    ),
+  );
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return AlertDialog(
-              title: const Text('Edit Appointment'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: _titleController,
-                      decoration: const InputDecoration(labelText: 'Title'),
-                    ),
-                    TextField(
-                      controller: _descriptionController,
-                      decoration: const InputDecoration(labelText: 'Description'),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<Caregiver>(
-                      value: selectedCaregiver,
-                      items: caregivers
-                          .map((c) => DropdownMenuItem(
-                                value: c,
-                                child: Text(c.name),
-                              ))
-                          .toList(),
-                      onChanged: (value) {
-                        setModalState(() {
-                          selectedCaregiver = value!;
-                        });
-                      },
-                      decoration: const InputDecoration(labelText: 'Assign to'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () async {
-                        final pickedDate = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDateTime,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2100),
-                        );
-                        if (pickedDate != null) {
-                          final pickedTime = await showTimePicker(
-                            context: context,
-                            initialTime: TimeOfDay.fromDateTime(selectedDateTime),
-                          );
-                          if (pickedTime != null) {
-                            setModalState(() {
-                              selectedDateTime = DateTime(
-                                pickedDate.year,
-                                pickedDate.month,
-                                pickedDate.day,
-                                pickedTime.hour,
-                                pickedTime.minute,
-                              );
-                            });
-                          }
-                        }
-                      },
-                      child: Text(
-                        'Pick Date & Time: ${selectedDateTime.toString().substring(0, 16)}',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (_titleController.text.trim().isEmpty) return;
+  DateTime selectedDateTime = appointment.dateTime;
+  Duration selectedDuration = appointment.duration;
 
-                    // Update the appointment
-                    setState(() {
-                      final index = appointments.indexWhere((a) => a.id == appointment.id);
-                      appointments[index] = appointment.copyWith(
-                        title: _titleController.text.trim(),
-                        description: _descriptionController.text.trim(),
-                        caregiverId: selectedCaregiver!.id,
-                        dateTime: selectedDateTime,
-                        duration: selectedDuration,
-                      );
-                    });
-
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _deleteAppointment(CaregiverAppointment appointment, BuildContext dialogContext) async {
-      try {
-        // await deleteAppointmentBackend(appointment.id); // backend call
-        setState(() {
-          appointments.removeWhere((a) => a.id == appointment.id);
-        });
-        Navigator.of(dialogContext).pop(); // pop dialog
-      } catch (e) {
-        // handle error
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to delete appointment: $e')),
-        );
-      }
-    }
-
-  void _showDeleteAppointmentDialog(CaregiverAppointment appointment) {
-      showDialog(
-        context: context,
-        builder: (context) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setModalState) {
           return AlertDialog(
-            title: const Text('Delete Appointment'),
-            content: Text(
-              'Are you sure you want to delete "${appointment.title}" from the schedule?',
+            title: const Text('Edit Appointment'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: _titleController,
+                    decoration: const InputDecoration(labelText: 'Title'),
+                  ),
+                  TextField(
+                    controller: _descriptionController,
+                    decoration: const InputDecoration(labelText: 'Description'),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<Caregiver>(
+                    value: selectedCaregiver,
+                    items: caregivers
+                        .map((c) => DropdownMenuItem(
+                              value: c,
+                              child: Text(c.name),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      setModalState(() {
+                        selectedCaregiver = value!;
+                      });
+                    },
+                    decoration: const InputDecoration(labelText: 'Assign to'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () async {
+                      final pickedDate = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDateTime,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2100),
+                      );
+                      if (pickedDate != null) {
+                        final pickedTime = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.fromDateTime(selectedDateTime),
+                        );
+                        if (pickedTime != null) {
+                          setModalState(() {
+                            selectedDateTime = DateTime(
+                              pickedDate.year,
+                              pickedDate.month,
+                              pickedDate.day,
+                              pickedTime.hour,
+                              pickedTime.minute,
+                            );
+                          });
+                        }
+                      }
+                    },
+                    child: Text(
+                      'Pick Date & Time: ${selectedDateTime.toString().substring(0, 16)}',
+                    ),
+                  ),
+                ],
+              ),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: const Text('Cancel'),
               ),
-
               ElevatedButton(
-              onPressed: () => _deleteAppointment(appointment, context),
-              child: Text('Delete'),
-            ),
+                onPressed: () async {
+                  if (_titleController.text.trim().isEmpty) return;
+
+                  final updatedAppointment = appointment.copyWith(
+                    title: _titleController.text.trim(),
+                    description: _descriptionController.text.trim(),
+                    caregiverId: selectedCaregiver!.id,
+                    dateTime: selectedDateTime,
+                    duration: selectedDuration,
+                  );
+
+                  // 1️⃣ Update local state optimistically
+                  final index = appointments.indexWhere((a) => a.id == appointment.id);
+                  setState(() {
+                    appointments[index] = updatedAppointment;
+                  });
+
+                  // 2️⃣ Update backend
+                  try {
+                    await updateAppointmentBackend(updatedAppointment);
+
+                    // 3️⃣ Reload appointments for week to refresh calendar header & grid
+                    await _loadAppointmentsForWeek(selectedDateTime);
+
+                    Navigator.of(context).pop(); // close dialog
+                  } catch (e) {
+                    // Roll back local changes if backend fails
+                    setState(() {
+                      appointments[index] = appointment;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to update appointment: $e')),
+                    );
+                  }
+                },
+                child: const Text('Save'),
+              ),
             ],
           );
         },
       );
-    }
+    },
+  );
+}
+
+
+// ---------------- Delete Appointment Dialog ----------------
+void _showDeleteAppointmentDialog(CaregiverAppointment appointment) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Delete Appointment'),
+        content: const Text('Are you sure you want to delete this appointment?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop(); // close dialog first
+
+              try {
+                await deleteAppointmentBackend(appointment.id);
+
+                // 1️⃣ Remove from local appointments
+                setState(() {
+                  appointments.removeWhere((a) => a.id == appointment.id);
+                  final dateKey = DateTime(
+                    appointment.dateTime.year,
+                    appointment.dateTime.month,
+                    appointment.dateTime.day,
+                  );
+                  groupedAppointments[dateKey]?.removeWhere((a) => a.id == appointment.id);
+                });
+
+                // 2️⃣ Reload weekly appointments
+                await _loadAppointmentsForWeek(selectedDate);
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Appointment deleted successfully')),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to delete appointment: $e')),
+                );
+              }
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      );
+    },
+  );
+}
 }
