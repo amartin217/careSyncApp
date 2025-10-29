@@ -349,14 +349,9 @@ Future<void> deleteAppointmentBackend(String id) async {
     return Scaffold(
       appBar: AppBar(
         title: Text("Care Schedule"),
+        centerTitle: true,
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.people),
-            onPressed: _showCaregiversDialog,
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -826,39 +821,6 @@ Future<void> deleteAppointmentBackend(String id) async {
     );
   }
 }
-
-  void _showCaregiversDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Care Team'),
-        content: Container(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: caregivers.length,
-            itemBuilder: (context, index) {
-              final caregiver = caregivers[index];
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: caregiver.color,
-                  // child: Text(caregiver.avatar, style: TextStyle(color: Colors.white)),
-                ),
-                title: Text(caregiver.name),
-                // subtitle: Text(caregiver.role),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showAddAppointmentDialog() {
       final _titleController = TextEditingController();
