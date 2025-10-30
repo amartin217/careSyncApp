@@ -13,6 +13,60 @@ class _LinkPatientPageState extends State<LinkPatientPage> {
   final codeController = TextEditingController();
   bool isLoading = false;
 
+   // Fixed 12-color caregiver palette
+  static const colorPalette = [
+    '#4A90E2', // Blue
+    '#7ED321', // Green
+    '#D0021B', // Red
+    '#F5A623', // Orange
+    '#9013FE', // Purple
+    '#50E3C2', // Teal
+    '#FF6F61', // Pink
+    '#00BCD4', // Cyan
+    '#CDDC39', // Lime
+    '#3F51B5', // Indigo
+    '#FFC107', // Amber
+    '#795548', // Brown
+  ];
+
+  Future<String> _assignUniqueColor(String patientId) async {
+    final supabase = Supabase.instance.client;
+
+    // Get all caregiver IDs linked to this patient
+    final existingCaregivers = await supabase
+        .from('CareRelation')
+        .select('user_id')
+        .eq('patient_id', patientId);
+
+    // Fetch colors already used
+    final caregiverIds =
+        existingCaregivers.map((row) => row['user_id']).whereType<String>().toList();
+
+    final usedColorsResponse = caregiverIds.isEmpty
+        ? []
+        : await supabase
+            .from('Profile')
+            .select('color')
+            .inFilter('user_id', caregiverIds);
+
+    final usedColors = usedColorsResponse
+        .map((row) => row['color'])
+        .whereType<String>()
+        .toSet();
+
+    // Pick a color not already used
+    final availableColors =
+        colorPalette.where((c) => !usedColors.contains(c)).toList();
+
+    if (availableColors.isEmpty) {
+      // fallback if all 12 are taken
+      availableColors.addAll(colorPalette);
+    }
+
+    availableColors.shuffle();
+    return availableColors.first;
+  }
+
   Future<void> _linkPatient() async {
     setState(() => isLoading = true);
     try {
@@ -35,6 +89,14 @@ class _LinkPatientPageState extends State<LinkPatientPage> {
         'user_id': userId,
         'patient_id': patient['patient_id'],
       });
+      
+      // Assign unique color for this caregiver
+      final color = await _assignUniqueColor(patient['patient_id']);
+
+      await supabase
+          .from('Profile')
+          .update({'color': color})
+          .eq('user_id', userId);
 
       if (context.mounted) {
         Navigator.of(context).pushAndRemoveUntil(
@@ -54,7 +116,7 @@ class _LinkPatientPageState extends State<LinkPatientPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false, // 🚫 removes back arrow
+        automaticallyImplyLeading: false, // removes back arrow
         title: const Text('Link Patient'),
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
