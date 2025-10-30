@@ -3,8 +3,8 @@ class Medication {
   String name;
   String dosage;
   String notes;
-  final List<String> timeslotIds;
-  final Map<String, bool> isTakenByTimeslot;
+  List<String> timeslotIds;
+  Map<String, bool> isTakenByTimeslot;
 
   Medication({
     required this.id,
