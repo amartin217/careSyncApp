@@ -76,11 +76,12 @@ class _MedicationPageState extends State<MedicationPage> {
         .select()
         .eq('patient_id', patientId) as List<dynamic>;
 
-    // 4️⃣ Fetch today's medication_log for this patient
+    // 4️⃣ Fetch today's medication logs for this patient
     final logData = await supabase
         .from('MedicationLog')
         .select()
-        .eq('date', today);
+        .eq('patient_id', patientId)
+        .eq('date', today) as List<dynamic>;
 
     setState(() {
       // Map timeslots
@@ -96,14 +97,20 @@ class _MedicationPageState extends State<MedicationPage> {
         );
       }).toList();
 
-      // Map medications with today's log
+      // Map medications with timeslots and today's logs
       medications = medData.map((m) {
-        final medLogs = logData.where((log) => log['medication_id'] == m['id']);
-        final isTakenByTimeslot = <String, bool>{
-          for (var log in medLogs)
-            log['timeslot_id'] as String: (log['is_taken'] as bool?) ?? false
-        };
-        final timeslotIds = medLogs.map((log) => log['timeslot_id'] as String).toList();
+        final List<String> timeslotIds =
+            (m['timeslot_ids'] as List<dynamic>?)?.cast<String>() ?? [];
+
+        // Build map of timeslot_id -> isTaken for this med
+        final isTakenByTimeslot = <String, bool>{};
+        for (final tsId in timeslotIds) {
+          final log = logData.firstWhere(
+            (l) => l['medication_id'] == m['id'] && l['timeslot_id'] == tsId,
+            orElse: () => <String, dynamic>{}, // return an empty map instead of null
+          );
+          isTakenByTimeslot[tsId] = log.isNotEmpty ? (log['is_taken'] as bool? ?? false) : false;
+        }
 
         return Medication(
           id: m['id'] as String,
@@ -116,6 +123,7 @@ class _MedicationPageState extends State<MedicationPage> {
       }).toList();
     });
   }
+
 
 
   
@@ -347,7 +355,7 @@ class _MedicationPageState extends State<MedicationPage> {
                   )),
               editedSlot,
             ];
-  
+
             _editMedication(m.id, m.name, m.dosage, m.notes, newSlotObjects);
   
             return m.copyWith(timeslotIds: [...m.timeslotIds, id]);
@@ -946,7 +954,9 @@ Widget build(BuildContext context) {
                 TextButton(
                   child: Text("Edit"),
                   onPressed: () {
-                    List<Timeslot> tempSelectedSlots = [];
+                    List<Timeslot> tempSelectedSlots = widget.timeslots
+                     .where((ts) => m.timeslotIds.contains(ts.id))
+                     .toList();
                     showDialog(
                       context: context,
                       builder: (context) {
@@ -1028,8 +1038,7 @@ Widget build(BuildContext context) {
                                     final updatedName = nameController.text.trim();
                                     final updatedDosage = dosageController.text.trim();
                                     final updatedNotes = notesController.text.trim();
-                                    if (updatedName.isNotEmpty &&
-                                        tempSelectedSlots.isNotEmpty) {
+                                    if (updatedName.isNotEmpty) {
                                       widget.editMedication(
                                         m.id,
                                         updatedName,
