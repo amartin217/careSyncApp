@@ -1,14 +1,6 @@
 enum AppointmentStatus {
   scheduled,
-  inProgress,
   completed,
-  cancelled,
-}
-
-enum Priority {
-  low,
-  medium,
-  high,
 }
 
 class CaregiverAppointment {
@@ -19,7 +11,7 @@ class CaregiverAppointment {
   final String caregiverId;
   final Duration duration;
   final AppointmentStatus status;
-  final Priority priority;
+  // final Priority priority;
 
   CaregiverAppointment({
     required this.id,
@@ -29,7 +21,6 @@ class CaregiverAppointment {
     required this.caregiverId,
     required this.duration,
     required this.status,
-    required this.priority,
   });
 
   CaregiverAppointment copyWith({
@@ -40,7 +31,7 @@ class CaregiverAppointment {
     String? caregiverId,
     Duration? duration,
     AppointmentStatus? status,
-    Priority? priority,
+    // Priority? priority,
   }) {
     return CaregiverAppointment(
       id: id ?? this.id,
@@ -50,7 +41,37 @@ class CaregiverAppointment {
       caregiverId: caregiverId ?? this.caregiverId,
       duration: duration ?? this.duration,
       status: status ?? this.status,
-      priority: priority ?? this.priority,
+     
     );
   }
+  
+  Map<String, dynamic> toJson() {
+  final endDateTime = dateTime.add(duration);
+
+  return {
+    'event_id': id,
+    'name': title,
+    'description': description,
+    'start_datetime': dateTime.toIso8601String(),
+    'end_datetime': endDateTime.toIso8601String(),
+    'assigned_user': caregiverId,
+    'is_completed': status == AppointmentStatus.completed,
+  };
+}
+
+factory CaregiverAppointment.fromJson(Map<String, dynamic> json) {
+  return CaregiverAppointment(
+    id: json['event_id'] as String,
+    title: json['name'] as String,
+    description: json['description'] as String,
+    dateTime: DateTime.parse(json['start_datetime'] as String),
+    caregiverId: json['assigned_user'] as String,
+    duration: DateTime.parse(json['end_datetime'] as String)
+        .difference(DateTime.parse(json['start_datetime'] as String)),
+    status: (json['is_completed'] as bool)
+        ? AppointmentStatus.completed
+        : AppointmentStatus.scheduled,
+  );
+}
+
 }
