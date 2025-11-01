@@ -221,40 +221,65 @@ class _ProfilePageState extends State<ProfilePage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          top: 24,
-          left: 24,
-          right: 24,
-        ),
-        child: Wrap(
-          children: [
-            const Center(
-              child: Text(
-                'Edit Profile',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            top: 24,
+            left: 24,
+            right: 24,
+          ),
+          child: Wrap(
+            children: [
+              const Center(
+                child: Text(
+                  'Edit Profile',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 16),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Name',
+                  border: OutlineInputBorder(),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: passwordController,
-              decoration: const InputDecoration(
-                labelText: 'New Password (optional)',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 16),
+              TextField(
+                controller: passwordController,
+                decoration: const InputDecoration(
+                  hintText: 'New Password',
+                  border: OutlineInputBorder(),
+                ),
+                obscureText: true,
+                onChanged: (_) => setModalState(() {}), // <-- use modal state
               ),
-              obscureText: true,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
+              const SizedBox(height: 8),
+              Builder(builder: (context) {
+                final pw = passwordController.text;
+                if (pw.isEmpty) return const SizedBox.shrink();
+                final meetsRequirement = pw.length >= 6;
+                return Row(
+                  children: [
+                    Icon(
+                      meetsRequirement ? Icons.check_circle : Icons.error,
+                      color: meetsRequirement ? Colors.green : Colors.red,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      meetsRequirement
+                          ? 'Password meets requirements'
+                          : 'Password must be at least 6 characters',
+                      style: TextStyle(
+                        color: meetsRequirement ? Colors.green : Colors.red,
+                      ),
+                    ),
+                  ],
+                );
+              }),
+              const SizedBox(height: 16),            ElevatedButton(
               onPressed: () async {
                 try {
                   // Update name in Profile table
@@ -289,7 +314,8 @@ class _ProfilePageState extends State<ProfilePage> {
               child: const Text('Save Changes'),
             ),
             const SizedBox(height: 16),
-          ],
+            ],
+          ),
         ),
       ),
     );
