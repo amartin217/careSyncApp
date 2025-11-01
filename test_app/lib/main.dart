@@ -195,20 +195,48 @@ class _SignUpPageState extends State<SignUpPage> {
           children: [
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(labelText: 'Full Name'),
+              decoration: const InputDecoration(labelText: 'Full Name *'),
             ),
             TextField(
               controller: emailController,
-              decoration: const InputDecoration(labelText: 'Email'),
+              decoration: const InputDecoration(labelText: 'Email *'),
             ),
             TextField(
               controller: passwordController,
-              decoration: const InputDecoration(labelText: 'Password'),
+              decoration: const InputDecoration(
+                labelText: 'Password *',
+              ),
               obscureText: true,
+              onChanged: (_) => setState(() {}), // triggers rebuild for password validation
             ),
+            const SizedBox(height: 8),
+            Builder(builder: (context) {
+              final pw = passwordController.text;
+              final meetsRequirement = pw.length >= 6;
+              return pw.isEmpty
+                  ? const SizedBox.shrink()
+                  : Row(
+                      children: [
+                        Icon(
+                          meetsRequirement ? Icons.check_circle : Icons.error,
+                          color: meetsRequirement ? Colors.green : Colors.red,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          meetsRequirement
+                              ? 'Password meets requirements'
+                              : 'Password must be at least 6 characters',
+                          style: TextStyle(
+                            color: meetsRequirement ? Colors.green : Colors.red,
+                          ),
+                        ),
+                      ],
+                    );
+            }),
             const SizedBox(height: 24),
             const Text(
-              'Are you a patient?',
+              'Are you a patient? *',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 8),
