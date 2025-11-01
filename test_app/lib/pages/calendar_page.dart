@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/appointment.dart';
 import '../models/caregiver.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../widgets/profile_menu.dart';
 
 final supabase = Supabase.instance.client;
 
@@ -352,6 +353,9 @@ Future<void> deleteAppointmentBackend(String id) async {
         centerTitle: true,
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
+        actions: const [
+          ProfileMenuButton(),
+        ],
       ),
       body: Column(
         children: [

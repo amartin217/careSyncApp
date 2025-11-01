@@ -4,6 +4,7 @@ import '../models/timeslot.dart';
 import 'dart:math';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import '../widgets/profile_menu.dart';
 
 
 class MedicationPage extends StatefulWidget {
@@ -399,6 +400,9 @@ class _MedicationPageState extends State<MedicationPage> {
           bottom: TabBar(
             tabs: [Tab(text: "Timeline"), Tab(text: "My Medications")],
           ),
+          actions: const [
+            ProfileMenuButton(),
+          ],
         ),
         body: TabBarView(
           children: [
