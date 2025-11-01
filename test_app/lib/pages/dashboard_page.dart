@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets/stat_card.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'link_patient_page.dart';
+import '../widgets/profile_menu.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -62,6 +63,9 @@ class DashboardPage extends StatelessWidget {
             title: const Text("Dashboard"),
             backgroundColor: Theme.of(context).primaryColor,
             foregroundColor: Colors.white,
+            actions: const [
+              ProfileMenuButton(),
+            ],
           ),
           body: Padding(
             padding: const EdgeInsets.all(16.0),
