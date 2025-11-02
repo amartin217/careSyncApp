@@ -648,6 +648,7 @@ class TimeslotCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      color: Colors.white,
       margin: const EdgeInsets.only(bottom: 16),
       child: ExpansionTile(
         key: PageStorageKey(slot.id),
@@ -762,7 +763,7 @@ class TimeslotCard extends StatelessWidget {
                                           selected: isSelected,
                                           selectedColor: Colors.blue,
                                           backgroundColor:
-                                              Colors.grey.shade300,
+                                              Colors.grey.shade100,
                                           side: BorderSide(
                                             color: isSelected
                                                 ? Colors.blue
@@ -847,15 +848,16 @@ class TimeslotCard extends StatelessWidget {
           return Container(
             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: medColor,
+              color: medColor.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 3,
-                  offset: Offset(1, 2),
-                ),
-              ],
+              border: Border.all(color: medColor, width: 1.5),
+              // boxShadow: [
+              //   BoxShadow(
+              //     color: Colors.black26,
+              //     blurRadius: 3,
+              //     offset: Offset(1, 2),
+              //   ),
+              // ],
             ),
             child: CheckboxListTile(
               title: Text(
@@ -925,15 +927,16 @@ Widget build(BuildContext context) {
         return Container(
           margin: EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: medColor,
+            color:  medColor.withOpacity(0.2),
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black26,
-                blurRadius: 3,
-                offset: Offset(1, 2),
-              ),
-            ],
+            border: Border.all(color: medColor, width: 1.5),
+            // boxShadow: [
+            //   BoxShadow(
+            //     color: Colors.black26,
+            //     blurRadius: 3,
+            //     offset: Offset(1, 2),
+            //   ),
+            // ],
           ),
           child: ListTile(
             title: Text(
