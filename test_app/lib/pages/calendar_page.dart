@@ -146,8 +146,6 @@ Future<List<CaregiverAppointment>> fetchAppointmentsForWeek(DateTime startOfWeek
   if (currentUser == null) {
     throw Exception('User not logged in — cannot fetch appointments.');
   }
-  // final endOfWeek = startOfWeek.add(Duration(days: 7));
-   // Truncate startOfWeek to midnight
   final start = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
   // End of week = 7 days later, also at midnight (exclusive)
   final end = start.add(const Duration(days: 7));
@@ -156,8 +154,6 @@ Future<List<CaregiverAppointment>> fetchAppointmentsForWeek(DateTime startOfWeek
     final response = await supabase
         .from('Event')
         .select()
-        // .gte('start_datetime', startOfWeek.toIso8601String())
-        // .lt('start_datetime', endOfWeek.toIso8601String());
         .gte('start_datetime', start.toIso8601String())
         .lt('start_datetime', end.toIso8601String());
 
@@ -197,6 +193,54 @@ List<CaregiverAppointment> _getAppointmentsForDate(DateTime date) {
   final dateKey = DateTime(date.year, date.month, date.day);
   return groupedAppointments[dateKey] ?? [];
 }
+
+bool isMonthView = false;
+
+Future<List<CaregiverAppointment>> fetchAppointmentsForMonth(DateTime referenceDate) async {
+  final supabase = Supabase.instance.client;
+  final currentUser = supabase.auth.currentUser;
+  if (currentUser == null) {
+    throw Exception('User not logged in — cannot fetch appointments.');
+  }
+
+  // Start and end of month
+  final startOfMonth = DateTime(referenceDate.year, referenceDate.month, 1);
+  final endOfMonth = DateTime(referenceDate.year, referenceDate.month + 1, 1);
+
+  try {
+    final response = await supabase
+        .from('Event')
+        .select()
+        .gte('start_datetime', startOfMonth.toIso8601String())
+        .lt('start_datetime', endOfMonth.toIso8601String());
+
+    if (response == null || response.isEmpty) {
+      return [];
+    }
+
+    return (response as List<dynamic>)
+        .map<CaregiverAppointment>((e) => CaregiverAppointment.fromJson(e))
+        .toList();
+  } catch (e) {
+    print('Failed to fetch appointments for month: $e');
+    return [];
+  }
+}
+
+Future<void> _loadAppointmentsForMonth(DateTime referenceDate) async {
+  final monthAppointments = await fetchAppointmentsForMonth(referenceDate);
+
+  final Map<DateTime, List<CaregiverAppointment>> grouped = {};
+  for (var appt in monthAppointments) {
+    final dateKey = DateTime(appt.dateTime.year, appt.dateTime.month, appt.dateTime.day);
+    grouped.putIfAbsent(dateKey, () => []).add(appt);
+  }
+
+  setState(() {
+    groupedAppointments = grouped;
+  });
+}
+
 
 /* ######################################
  * Link to backend
@@ -345,86 +389,256 @@ Future<void> deleteAppointmentBackend(String id) async {
  * ######################################
  */
   @override
+
+@override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false, // prevents automatic resizing when keyboard appears
       appBar: AppBar(
         title: Text("Care Schedule"),
         centerTitle: true,
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
       ),
-      body: Column(
-        children: [
-          _buildWeeklyCalendarHeader(),
-          _buildWeeklyCalendarGrid(),
-          _buildCaregiverLegend(),
-          Expanded(
-            child: _buildAppointmentsList(),
-          ),
-        ],
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // --- Header with week/month toggle ---
+            _buildCalendarHeader(),
+
+            // --- Calendar Grid ---
+            if (isMonthView)
+              SizedBox(
+                height: 450, // fixed height for month grid
+                child: _buildMonthlyCalendarGrid(),
+              )
+            else
+              SizedBox(
+                height: 110, // fixed height for week grid
+                child: _buildWeeklyCalendarGrid(),
+              ),
+
+            // --- Caregiver Legend ---
+            _buildCaregiverLegend(),
+
+            // --- Appointments list ---
+            // Wrap in SizedBox to give it a fixed height so scroll works
+            SizedBox(
+              height: 400, // adjust this depending on screen
+              child: _buildAppointmentsList(),
+            ),
+          ],
+        ),
       ),
-
-
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddAppointmentDialog,
         child: Icon(Icons.add),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat, // ⬅ bottom-right
-
-
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
-  Widget _buildWeeklyCalendarHeader() {
-    // Get the start and end of the current week
-    final startOfWeek = selectedDate.subtract(Duration(days: selectedDate.weekday % 7));
-    final endOfWeek = startOfWeek.add(Duration(days: 7));
-    
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).primaryColor.withOpacity(0.1),
-        border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          IconButton(
-            onPressed: () {
-              setState(() {
-                selectedDate = selectedDate.subtract(Duration(days: 7)); // Go back one week
-                _loadAppointments();
-                _loadAppointmentsForWeek(selectedDate);
-              });
-            },
-            icon: Icon(Icons.chevron_left),
-          ),
-          Column(
-            children: [
-              Text(
-                _formatMonthYear(selectedDate),
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              Text(
-                '${_formatShortDate(startOfWeek)} - ${_formatShortDate(endOfWeek)}',
-                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-              ),
-            ],
-          ),
-          IconButton(
-            onPressed: () {
-              setState(() {
-                selectedDate = selectedDate.add(Duration(days: 7)); // Go forward one week
-                _loadAppointments();
-                _loadAppointmentsForWeek(selectedDate);
-              });
-            },
-            icon: Icon(Icons.chevron_right),
+// Widget _buildCalendarHeader() {
+//   final startOfWeek =
+//       selectedDate.subtract(Duration(days: selectedDate.weekday % 7));
+//   final endOfWeek = startOfWeek.add(Duration(days: 6));
+
+//   return Container(
+//     padding: const EdgeInsets.all(16),
+//     decoration: BoxDecoration(
+//       color: Theme.of(context).primaryColor.withOpacity(0.1),
+//       border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+//     ),
+//     child: Column(
+//       children: [
+//         // First row: arrows + month/week text
+//         Row(
+//           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//           children: [
+//             // ⬅️ PREVIOUS
+//             IconButton(
+//               onPressed: () {
+//                 setState(() {
+//                   if (isMonthView) {
+//                     selectedDate = DateTime(selectedDate.year, selectedDate.month - 1, 1);
+//                     _loadAppointmentsForMonth(selectedDate);
+//                   } else {
+//                     selectedDate = selectedDate.subtract(const Duration(days: 7));
+//                     _loadAppointmentsForWeek(selectedDate);
+//                   }
+//                   _loadAppointments();
+//                 });
+//               },
+//               icon: const Icon(Icons.chevron_left),
+//             ),
+
+//             // Month / Week display
+//             Column(
+//               children: [
+//                 Text(
+//                   _formatMonthYear(selectedDate),
+//                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+//                 ),
+//                 Text(
+//                   '${_formatShortDate(startOfWeek)} - ${_formatShortDate(endOfWeek)}',
+//                   style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+//                 ),
+//               ],
+//             ),
+
+//             // ➡️ NEXT
+//             IconButton(
+//               onPressed: () {
+//                 setState(() {
+//                   if (isMonthView) {
+//                     selectedDate = DateTime(selectedDate.year, selectedDate.month + 1, 1);
+//                     _loadAppointmentsForMonth(selectedDate);
+//                   } else {
+//                     selectedDate = selectedDate.add(const Duration(days: 7));
+//                     _loadAppointmentsForWeek(selectedDate);
+//                   }
+//                   _loadAppointments();
+//                 });
+//               },
+//               icon: const Icon(Icons.chevron_right),
+//             ),
+//           ],
+//         ),
+
+//         const SizedBox(height: 12),
+
+//         // Second row: toggle chips centered
+//         Row(
+//           mainAxisAlignment: MainAxisAlignment.center,
+//           children: [
+//             ChoiceChip(
+//               label: const Text('Week'),
+//               selected: !isMonthView,
+//               onSelected: (val) {
+//                 setState(() {
+//                   isMonthView = false;
+//                   _loadAppointmentsForWeek(selectedDate);
+//                 });
+//               },
+//             ),
+//             const SizedBox(width: 8),
+//             ChoiceChip(
+//               label: const Text('Month'),
+//               selected: isMonthView,
+//               onSelected: (val) {
+//                 setState(() {
+//                   isMonthView = true;
+//                   _loadAppointmentsForMonth(selectedDate);
+//                 });
+//               },
+//             ),
+//           ],
+//         ),
+//       ],
+//     ),
+//   );
+// }
+
+Widget _buildCalendarHeader() {
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Theme.of(context).primaryColor.withOpacity(0.1),
+      border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+    ),
+    child: Column(
+      children: [
+        // First row: arrows + month text
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // ⬅️ PREVIOUS
+            IconButton(
+              onPressed: () {
+                setState(() {
+                  if (isMonthView) {
+                    selectedDate = DateTime(selectedDate.year, selectedDate.month - 1, 1);
+                    _loadAppointmentsForMonth(selectedDate);
+                  } else {
+                    selectedDate = selectedDate.subtract(const Duration(days: 7));
+                    _loadAppointmentsForWeek(selectedDate);
+                  }
+                  _loadAppointments();
+                });
+              },
+              icon: const Icon(Icons.chevron_left),
+            ),
+
+            // Month display
+            Text(
+              _formatMonthYear(selectedDate),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+
+            // ➡️ NEXT
+            IconButton(
+              onPressed: () {
+                setState(() {
+                  if (isMonthView) {
+                    selectedDate = DateTime(selectedDate.year, selectedDate.month + 1, 1);
+                    _loadAppointmentsForMonth(selectedDate);
+                  } else {
+                    selectedDate = selectedDate.add(const Duration(days: 7));
+                    _loadAppointmentsForWeek(selectedDate);
+                  }
+                  _loadAppointments();
+                });
+              },
+              icon: const Icon(Icons.chevron_right),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        // Toggle chips centered
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ChoiceChip(
+              label: const Text('Week'),
+              selected: !isMonthView,
+              onSelected: (val) {
+                setState(() {
+                  isMonthView = false;
+                  _loadAppointmentsForWeek(selectedDate);
+                });
+              },
+            ),
+            const SizedBox(width: 8),
+            ChoiceChip(
+              label: const Text('Month'),
+              selected: isMonthView,
+              onSelected: (val) {
+                setState(() {
+                  isMonthView = true;
+                  _loadAppointmentsForMonth(selectedDate);
+                });
+              },
+            ),
+          ],
+        ),
+
+        // Optional: Only show week range in WEEK view
+        if (!isMonthView) ...[
+          const SizedBox(height: 8),
+          Text(
+            '${_formatShortDate(selectedDate.subtract(Duration(days: selectedDate.weekday % 7)))}'
+            ' - '
+            '${_formatShortDate(selectedDate.subtract(Duration(days: selectedDate.weekday % 7)).add(const Duration(days: 6)))}',
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
           ),
         ],
-      ),
-    );
-  }
+      ],
+    ),
+  );
+}
+
 
   Widget _buildWeeklyCalendarGrid() {
     // Get the start of the week (Sunday) for the selected date
@@ -530,6 +744,123 @@ Future<void> deleteAppointmentBackend(String id) async {
                 );
               }),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMonthlyCalendarGrid() {
+    // Get the first day of the current month
+    final firstDayOfMonth = DateTime(selectedDate.year, selectedDate.month, 1);
+    // Find the start of the first week (Sunday) that includes the first day
+    final startOfCalendar = firstDayOfMonth.subtract(Duration(days: firstDayOfMonth.weekday % 7));
+    // Calculate total number of days to display (6 weeks = 42 days)
+    const totalDays = 42;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          // Weekday headers
+          Row(
+            children: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+                .map((day) => Expanded(
+                      child: Center(
+                        child: Text(
+                          day,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue[600],
+                          ),
+                        ),
+                      ),
+                    ))
+                .toList(),
+          ),
+          const SizedBox(height: 8),
+          // Month grid (6 weeks, 7 days per week)
+          Column(
+            children: List.generate(6, (weekIndex) {
+              return Row(
+                children: List.generate(7, (dayIndex) {
+                  final dayOffset = weekIndex * 7 + dayIndex;
+                  final currentDate = startOfCalendar.add(Duration(days: dayOffset));
+                  final isToday = _isSameDay(currentDate, DateTime.now());
+                  final isSelected = _isSameDay(currentDate, selectedDate);
+                  final isCurrentMonth = currentDate.month == selectedDate.month;
+                  final dayAppointments = _getAppointmentsForDate(currentDate);
+
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          selectedDate = currentDate;
+                          _loadAppointments();
+                          _loadAppointmentsForMonth(selectedDate);
+                        });
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Theme.of(context).primaryColor
+                              : isToday
+                                  ? Theme.of(context).primaryColor.withOpacity(0.2)
+                                  : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          border: isToday && !isSelected
+                              ? Border.all(color: Theme.of(context).primaryColor, width: 2)
+                              : null,
+                        ),
+                        height: 60,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              currentDate.day.toString(),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: isSelected
+                                    ? Colors.white
+                                    : isCurrentMonth
+                                        ? Colors.black
+                                        : Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            // Appointment indicators
+                            if (dayAppointments.isNotEmpty)
+                              Container(
+                                height: 14,
+                                child: Wrap(
+                                  spacing: 2,
+                                  runSpacing: 2,
+                                  alignment: WrapAlignment.center,
+                                  children: dayAppointments
+                                      .take(3)
+                                      .map((apt) => Container(
+                                            width: 6,
+                                            height: 6,
+                                            decoration: BoxDecoration(
+                                              color: _getCaregiverById(apt.caregiverId)?.color ??
+                                                  Colors.blue,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ))
+                                      .toList(),
+                                ),
+                              )
+                            else
+                              const SizedBox(height: 14),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              );
+            }),
           ),
         ],
       ),
@@ -1108,7 +1439,6 @@ Future<void> deleteAppointmentBackend(String id) async {
     },
   );
 }
-
 
 // ---------------- Delete Appointment Dialog ----------------
 void _showDeleteAppointmentDialog(CaregiverAppointment appointment) {
