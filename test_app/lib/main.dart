@@ -12,6 +12,8 @@ import 'pages/vitals_config_page.dart';
 import 'models/vital.dart';
 import 'models/vital_timeslot.dart';
 import 'models/vital_reading.dart';
+import '../widgets/profile_menu.dart';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -397,6 +399,9 @@ class _VitalsScreenState extends State<VitalsScreen> {
               Tab(text: 'Configuration'),
             ],
           ),
+          actions: const [
+            ProfileMenuButton(),
+          ],
         ),
         body: TabBarView(
           children: [
