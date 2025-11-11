@@ -133,34 +133,59 @@ class _MedicationPageState extends State<MedicationPage> {
   Future<void> _toggleTaken(String medId, String timeslotId) async {
     final supabase = Supabase.instance.client;
     final today = DateTime.now().toIso8601String().split('T')[0];
-    final med = medications.firstWhere((m) => m.id == medId);
+    final medIndex = medications.indexWhere((m) => m.id == medId);
+    if (medIndex == -1) return;
+  
+    final med = medications[medIndex];
     final newValue = !(med.isTakenByTimeslot[timeslotId] ?? false);
     final userId = supabase.auth.currentUser!.id;
+  
+    // Get patient_id
     final careRelation = await supabase
         .from('CareRelation')
         .select('patient_id')
         .eq('user_id', userId);
-
+  
     final patientId = (careRelation as List).isNotEmpty
         ? careRelation.first['patient_id'] as String
         : userId;
-
-    await supabase.from('MedicationLog').insert({
-      'id': const Uuid().v4(),
-      'medication_id': medId,
-      'timeslot_id': timeslotId,
-      'date': today,
-      'is_taken': newValue,
-      'taken_at': DateTime.now().toIso8601String(),
-      'recorder_id': userId,
-      'patient_id': patientId,
-    });
-
-    setState(() {
-      med.isTakenByTimeslot[timeslotId] = newValue;
-    });
+  
+    try {
+      // ✅ upsert to Supabase
+      await supabase.from('MedicationLog').upsert({
+        'medication_id': medId,
+        'timeslot_id': timeslotId,
+        'date': today,
+        'is_taken': newValue,
+        'taken_at': DateTime.now().toIso8601String(),
+        'recorder_id': userId,
+        'patient_id': patientId,
+      }, onConflict: 'medication_id,timeslot_id,date');
+  
+      // ✅ update local state immutably
+      setState(() {
+        final updatedMed = med.copyWith(
+          isTakenByTimeslot: {
+            ...med.isTakenByTimeslot,
+            timeslotId: newValue,
+          },
+        );
+  
+        medications = [
+          ...medications.take(medIndex),
+          updatedMed,
+          ...medications.skip(medIndex + 1),
+        ];
+      });
+  
+      debugPrint('✅ Toggled med=$medId, slot=$timeslotId → $newValue');
+    } catch (e) {
+      debugPrint('❌ Failed to toggle medication $medId: $e');
+    }
   }
 
+  
+  
 
   Future<void> _deleteMedication(String id) async {
     final supabase = Supabase.instance.client;
