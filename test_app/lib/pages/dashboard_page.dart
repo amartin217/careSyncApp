@@ -160,7 +160,7 @@ class DashboardPage extends StatelessWidget {
         final nowMinutes = now.hour * 60 + now.minute;
         if (!isTaken && slotMinutes < nowMinutes) {
           missed.add(item);
-        } else if (slotMinutes >= nowMinutes) {
+        } else if (!isTaken && slotMinutes >= nowMinutes) {
           upcoming.add(item);
         }
       }
@@ -268,8 +268,9 @@ class DashboardPage extends StatelessWidget {
   
                       final missed = medsSnapshot.data!['missed']!;
                       final upcoming = medsSnapshot.data!['upcoming']!;
-  
-                      return Column(
+                      return Container(
+                        width: double.infinity, // 👈 makes sure Column takes full width
+                        child: Column(                                           
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           if (missed.isNotEmpty) ...[
@@ -319,7 +320,7 @@ class DashboardPage extends StatelessWidget {
                                 .toList(),
                           ),
                         ],
-                      );
+                      ));
                     },
                   ),
               ],
