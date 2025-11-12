@@ -3,6 +3,7 @@ import '../widgets/stat_card.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'link_patient_page.dart';
 import '../widgets/profile_menu.dart';
+import 'package:intl/intl.dart'; // ✅ add this line
 
 class DashboardPage extends StatelessWidget {
   DashboardPage({super.key});
@@ -176,6 +177,38 @@ class DashboardPage extends StatelessWidget {
     return {'missed': missed, 'upcoming': upcoming};
   }
 
+  // 🆕 Fetch upcoming events based on user type
+  Future<List<Map<String, dynamic>>> _fetchUpcomingEvents({required bool isPatient}) async {
+    final supabase = Supabase.instance.client;
+    final userId = supabase.auth.currentUser!.id;
+    final now = DateTime.now().toIso8601String();
+
+    List<dynamic> events;
+
+    if (isPatient) {
+      // Patient sees all their own upcoming events
+      events = await supabase
+          .from('Event')
+          .select('event_id, name, start_datetime, end_datetime, description')
+          .eq('patient_id', userId)
+          .gte('start_datetime', now)
+          .order('start_datetime', ascending: true);
+    } else {
+      // Caregiver sees only their assigned events
+      events = await supabase
+          .from('Event')
+          .select('event_id, name, start_datetime, end_datetime, description')
+          .eq('assigned_user', userId)
+          .gte('start_datetime', now)
+          .order('start_datetime', ascending: true);
+    }
+
+    return (events as List)
+        .map((e) => e as Map<String, dynamic>)
+        .toList();
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>?>(
@@ -319,6 +352,35 @@ class DashboardPage extends StatelessWidget {
                                 .map((m) => _buildMedTile(context, m))
                                 .toList(),
                           ),
+                          const SizedBox(height: 32),
+                          // 🆕 Upcoming Events Section
+                          FutureBuilder<List<Map<String, dynamic>>>(
+                            future: _fetchUpcomingEvents(isPatient: isPatient),
+                            builder: (context, eventSnapshot) {
+                              if (eventSnapshot.connectionState == ConnectionState.waiting) {
+                                return const Center(child: CircularProgressIndicator());
+                              }
+
+                              final events = eventSnapshot.data ?? [];
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Upcoming Appointments",
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  if (events.isEmpty)
+                                    const Text("No upcoming appointments."),
+                                  ...events.map((e) => _buildEventTile(context, e)).toList(),
+                                ],
+                              );
+                            },
+                          ),
                         ],
                       ));
                     },
@@ -362,6 +424,42 @@ class DashboardPage extends StatelessWidget {
       ),
     );
   }
+
+  // 🆕 Helper to display a single calendar event
+  Widget _buildEventTile(BuildContext context, Map<String, dynamic> event) {
+    final start = DateTime.parse(event['start_datetime']);
+    final end = DateTime.parse(event['end_datetime']);
+    final formatter = DateFormat('EEE, MMM d • h:mm a');
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              event['name'] ?? 'Untitled Event',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text("${formatter.format(start)} - ${DateFormat('h:mm a').format(end)}",
+                style: const TextStyle(color: Colors.black54)),
+            if (event['description'] != null &&
+                (event['description'] as String).trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(event['description'],
+                    style: const TextStyle(fontSize: 14)),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   
 
 }
