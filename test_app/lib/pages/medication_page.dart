@@ -14,7 +14,7 @@ class MedicationPage extends StatefulWidget {
 
 
 class _MedicationPageState extends State<MedicationPage> {
-  final Map<String, Color> medColors = {}; // maps med.id -> color
+  final Map<String, Color> medColors = {}; 
 
   final List<Color> colors = [
     Colors.blue.shade100,
@@ -36,7 +36,7 @@ class _MedicationPageState extends State<MedicationPage> {
 
   Color _getMedColor(String medId) {
     if (!medColors.containsKey(medId)) {
-      final index = medColors.length % colors.length; // sequential assignment
+      final index = medColors.length % colors.length; 
       medColors[medId] = colors[index];
     }
     return medColors[medId]!;
@@ -52,7 +52,7 @@ class _MedicationPageState extends State<MedicationPage> {
     final supabase = Supabase.instance.client;
     final today = DateTime.now().toIso8601String().split('T')[0]; // YYYY-MM-DD
 
-    // 1️⃣ Determine patient ID
+    // Determine patient ID
     final userId = supabase.auth.currentUser!.id;
 
     // Get patient linked to caregiver, or use self if patient
@@ -65,19 +65,19 @@ class _MedicationPageState extends State<MedicationPage> {
         ? careRelation.first['patient_id'] as String
         : userId;
 
-    // 2️⃣ Fetch medications for this patient
+    // Fetch medications for this patient
     final medData = await supabase
         .from('Medication')
         .select()
         .eq('patient_id', patientId) as List<dynamic>;
 
-    // 3️⃣ Fetch timeslots for this patient
+    // Fetch timeslots for this patient
     final timeData = await supabase
         .from('Timeslot')
         .select()
         .eq('patient_id', patientId) as List<dynamic>;
 
-    // 4️⃣ Fetch today's medication logs for this patient
+    // Fetch today's medication logs for this patient
     final logData = await supabase
         .from('MedicationLog')
         .select()
@@ -125,11 +125,6 @@ class _MedicationPageState extends State<MedicationPage> {
     });
   }
 
-
-
-  
-
-
   Future<void> _toggleTaken(String medId, String timeslotId) async {
     final supabase = Supabase.instance.client;
     final today = DateTime.now().toIso8601String().split('T')[0];
@@ -140,7 +135,6 @@ class _MedicationPageState extends State<MedicationPage> {
     final newValue = !(med.isTakenByTimeslot[timeslotId] ?? false);
     final userId = supabase.auth.currentUser!.id;
   
-    // Get patient_id
     final careRelation = await supabase
         .from('CareRelation')
         .select('patient_id')
@@ -151,7 +145,7 @@ class _MedicationPageState extends State<MedicationPage> {
         : userId;
   
     try {
-      // ✅ upsert to Supabase
+      // upsert to Supabase
       await supabase.from('MedicationLog').upsert({
         'medication_id': medId,
         'timeslot_id': timeslotId,
@@ -162,7 +156,7 @@ class _MedicationPageState extends State<MedicationPage> {
         'patient_id': patientId,
       }, onConflict: 'medication_id,timeslot_id,date');
   
-      // ✅ update local state immutably
+      // update local state immutably
       setState(() {
         final updatedMed = med.copyWith(
           isTakenByTimeslot: {
@@ -178,9 +172,9 @@ class _MedicationPageState extends State<MedicationPage> {
         ];
       });
   
-      debugPrint('✅ Toggled med=$medId, slot=$timeslotId → $newValue');
+      debugPrint('Toggled med=$medId, slot=$timeslotId → $newValue');
     } catch (e) {
-      debugPrint('❌ Failed to toggle medication $medId: $e');
+      debugPrint('Failed to toggle medication $medId: $e');
     }
   }
 
@@ -237,7 +231,7 @@ class _MedicationPageState extends State<MedicationPage> {
         'name': name,
         'dosage': dosage,
         'notes': notes,
-        'timeslot_ids': timeslotIds, // ← this must match your column name in Supabase
+        'timeslot_ids': timeslotIds,
       }).eq('id', id);
 
       debugPrint('✅ Updated Medication $id with timeslotIds: $timeslotIds');
@@ -245,7 +239,6 @@ class _MedicationPageState extends State<MedicationPage> {
       debugPrint('❌ Failed to update Medication $id: $e');
     }
 
-    // Optionally: also update local state if necessary
     setState(() {
       medications = medications.map((m) {
         if (m.id == id) {
@@ -258,34 +251,50 @@ class _MedicationPageState extends State<MedicationPage> {
 
 
   
-  void _deleteTimeslot(String timeslotId) {
-  setState(() {
-    // Remove the timeslot from the list
-    timeslots.removeWhere((ts) => ts.id == timeslotId);
+  Future<void> _deleteTimeslot(String timeslotId) async {
+    final supabase = Supabase.instance.client;
 
-    // Remove the timeslot from all medications
-    medications = medications.map((m) {
-      final newTimeslotIds = List<String>.from(m.timeslotIds)
-        ..remove(timeslotId);
+    try {
+      await supabase
+          .from('MedicationLog')
+          .delete()
+          .eq('timeslot_id', timeslotId);
 
-      // Also remove its taken status
-      final newTakenMap = Map<String, bool>.from(m.isTakenByTimeslot)
-        ..remove(timeslotId);
+      await supabase
+          .from('Timeslot')
+          .delete()
+          .eq('id', timeslotId);
 
-      return m.copyWith(
-        timeslotIds: newTimeslotIds,
-        isTakenByTimeslot: newTakenMap,
+      setState(() {
+        timeslots.removeWhere((ts) => ts.id == timeslotId);
+
+        medications = medications.map((m) {
+          final newTimeslotIds = List<String>.from(m.timeslotIds)
+            ..remove(timeslotId);
+
+          final newTakenMap = Map<String, bool>.from(m.isTakenByTimeslot)
+            ..remove(timeslotId);
+
+          return m.copyWith(
+            timeslotIds: newTimeslotIds,
+            isTakenByTimeslot: newTakenMap,
+          );
+        }).toList();
+      });
+
+      debugPrint('Timeslot $timeslotId and its related logs deleted successfully.');
+    } catch (error) {
+      debugPrint('Failed to delete timeslot: $error');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete timeslot. Please try again.')),
       );
-    }).toList();
-  });
+    }
   }
-
 
   Future<void> _addTimeslot(Timeslot slot, List<Medication> selectedMeds) async {
   final supabase = Supabase.instance.client;
 
   try {
-    // 1️⃣ Determine patient ID
     final userId = supabase.auth.currentUser!.id;
     final careRelation = await supabase
         .from('CareRelation')
@@ -296,7 +305,6 @@ class _MedicationPageState extends State<MedicationPage> {
         ? careRelation.first['patient_id'] as String
         : userId;
 
-    // 2️⃣ Insert timeslot into Supabase
     await supabase.from('Timeslot').insert({
       'id': slot.id,
       'label': slot.label,
@@ -304,11 +312,10 @@ class _MedicationPageState extends State<MedicationPage> {
       'patient_id': patientId,
     });
 
-    // 3️⃣ Create medication_log entries for each linked medication (for today)
     final today = DateTime.now().toIso8601String().split('T')[0];
     for (final med in selectedMeds) {
-      await supabase.from('medication_log').insert({
-        'id': med.id, // or generate new UUID if your log table uses unique IDs
+      await supabase.from('MedicationLog').insert({
+        'id': med.id, 
         'patient_id': patientId,
         'recorder_id': supabase.auth.currentUser!.id,
         'medication_id': med.id,
@@ -318,7 +325,6 @@ class _MedicationPageState extends State<MedicationPage> {
       });
     }
 
-    // 4️⃣ Update local state for UI
     setState(() {
       timeslots.add(slot);
 
@@ -342,17 +348,14 @@ class _MedicationPageState extends State<MedicationPage> {
     final supabase = Supabase.instance.client;
   
     try {
-      // 1️⃣ Update Timeslot in Supabase
       await supabase.from('Timeslot').update({
         'label': label,
         'time': '${time.hour}:${time.minute}',
       }).eq('id', id);
   
-      debugPrint('✅ Timeslot $id updated in Supabase');
+      debugPrint('Timeslot $id updated in Supabase');
   
-      // 2️⃣ Update local state
       setState(() {
-        // Update only the changed fields
         timeslots = timeslots.map((slot) {
           if (slot.id == id) {
             return slot.copyWith(
@@ -363,7 +366,6 @@ class _MedicationPageState extends State<MedicationPage> {
           return slot;
         }).toList();
   
-        // 3️⃣ Update medications immutably
         final editedSlot = timeslots.firstWhere(
           (t) => t.id == id,
           orElse: () => Timeslot(id: id, label: label, time: time),
@@ -400,14 +402,12 @@ class _MedicationPageState extends State<MedicationPage> {
         }).toList();
       });
   
-      debugPrint('✅ Timeslot $id updated in UI');
+      debugPrint('Timeslot $id updated in UI');
     } catch (e, stack) {
-      debugPrint('❌ Supabase update failed: $e');
+      debugPrint('Supabase update failed: $e');
       debugPrint(stack.toString());
     }
   }
-
-
 
   @override
   void initState() {
@@ -443,8 +443,8 @@ class _MedicationPageState extends State<MedicationPage> {
             MyMedicationsScreen(
               medications: medications,
               timeslots: timeslots,
-              deleteMedication: _deleteMedication, // pass the real function
-              addMedication: _addMedication,       // also pass the real add function
+              deleteMedication: _deleteMedication, 
+              addMedication: _addMedication,
               editMedication: _editMedication,
               getMedColor: _getMedColor,
             ),
@@ -454,7 +454,6 @@ class _MedicationPageState extends State<MedicationPage> {
     );
   }
 }
-
 
 /// ---------------------
 /// Timeline View
@@ -506,7 +505,6 @@ class MedicationTimelineScreen extends StatelessWidget {
       getMedColor: getMedColor,
     );
   }).toList(),
-
         SizedBox(height: 12),
         ElevatedButton(
         child: Text("+ Add Timeslot"),
@@ -526,7 +524,6 @@ class MedicationTimelineScreen extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Name input field
                         TextField(
                           decoration: const InputDecoration(
                             labelText: "Timeslot Name",
@@ -535,8 +532,6 @@ class MedicationTimelineScreen extends StatelessWidget {
                           onChanged: (val) => newLabel = val,
                         ),
                         const SizedBox(height: 16),
-
-                        // Time picker field
                         GestureDetector(
                           onTap: () async {
                             final TimeOfDay? picked = await showTimePicker(
@@ -565,8 +560,6 @@ class MedicationTimelineScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 20),
-
-                        // Medication chips
                         const Text(
                           "Assign to Medications:",
                           style: TextStyle(fontWeight: FontWeight.bold),
@@ -620,10 +613,8 @@ class MedicationTimelineScreen extends StatelessWidget {
                               id: const Uuid().v4(),
                               time: selectedTime,
                             );
-
                             addTimeslot(newSlot, selectedMeds);
                             Navigator.pop(context);
-
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
@@ -658,7 +649,6 @@ class TimeslotCard extends StatelessWidget {
   final MedicationTimelineScreen medicationTimelineScreenPointer;
   final Color Function(String medId) getMedColor;
 
-
   TimeslotCard({
     required this.slot,
     required this.meds,
@@ -682,7 +672,6 @@ class TimeslotCard extends StatelessWidget {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // left side: name + time
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -702,13 +691,11 @@ class TimeslotCard extends StatelessWidget {
                 ),
               ],
             ),
-            // right side: icons
             Row(
               children: [
                 IconButton(
                   icon: const Icon(Icons.edit, color: Colors.blue),
                   onPressed: () {
-                    // existing edit dialog logic here
                     String editedLabel = slot.label;
                     TimeOfDay editedTime = slot.time;
                     List<Medication> selectedMeds = [];
@@ -876,13 +863,6 @@ class TimeslotCard extends StatelessWidget {
               color: medColor.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: medColor, width: 1.5),
-              // boxShadow: [
-              //   BoxShadow(
-              //     color: Colors.black26,
-              //     blurRadius: 3,
-              //     offset: Offset(1, 2),
-              //   ),
-              // ],
             ),
             child: CheckboxListTile(
               title: Text(
@@ -955,13 +935,6 @@ Widget build(BuildContext context) {
             color:  medColor.withOpacity(0.2),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: medColor, width: 1.5),
-            // boxShadow: [
-            //   BoxShadow(
-            //     color: Colors.black26,
-            //     blurRadius: 3,
-            //     offset: Offset(1, 2),
-            //   ),
-            // ],
           ),
           child: ListTile(
             title: Text(
@@ -995,7 +968,6 @@ Widget build(BuildContext context) {
                         String name = m.name;
                         String dosage = m.dosage;
                         String notes = m.notes;
-
                         return StatefulBuilder(
                           builder: (context, setStateDialog) {
                             final TextEditingController nameController =
@@ -1004,7 +976,6 @@ Widget build(BuildContext context) {
                                 TextEditingController(text: m.dosage);
                             final TextEditingController notesController =
                                 TextEditingController(text: m.notes);
-
                             return AlertDialog(
                               title: const Text("Edit Medication"),
                               content: SingleChildScrollView(
@@ -1201,8 +1172,7 @@ Widget build(BuildContext context) {
                       ElevatedButton(
                         onPressed: () {
                           if (name.isNotEmpty &&
-                              dosage.isNotEmpty &&
-                              tempSelectedSlots.isNotEmpty) {
+                              dosage.isNotEmpty) {
                             widget.addMedication(
                               Medication(
                                 id: const Uuid().v4(),
