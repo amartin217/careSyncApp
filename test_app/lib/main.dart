@@ -33,12 +33,62 @@ class CaregiverSupportApp extends StatelessWidget {
     return MaterialApp(
       title: 'Caregiver Support',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
         useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF5C7C9D), // muted steel blue
+          brightness: Brightness.light,
+        ),
+        scaffoldBackgroundColor: const Color(0xFFF3F6F8), // soft gray-blue background
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          foregroundColor: Color(0xFF1E2D3D),
+          elevation: 0,
+          centerTitle: true,
+          titleTextStyle: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1E2D3D),
+          ),
+        ),
+        cardTheme: CardTheme(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          color: Colors.white,
+          elevation: 2,
+          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF6C8DA7), // soft blue-gray
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            textStyle: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+            ),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          hintStyle: const TextStyle(color: Colors.black38),
+        ),
+        textTheme: const TextTheme(
+          bodyMedium: TextStyle(color: Color(0xFF2E3A4A)),
+        ),
       ),
       home: const AuthGate(),
     );
   }
+
 }
 
 class AuthGate extends StatelessWidget {

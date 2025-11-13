@@ -421,9 +421,32 @@ class _MedicationPageState extends State<MedicationPage> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: Text("Medication"),
-          bottom: TabBar(
-            tabs: [Tab(text: "Timeline"), Tab(text: "My Medications")],
+          title: const Text("Medication"),
+          centerTitle: true,
+          foregroundColor: Colors.white,
+          titleTextStyle: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+          elevation: 0,
+          flexibleSpace: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF6C8DA7), Color(0xFF5C7C9D)], // same as Dashboard
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: "Timeline"),
+              Tab(text: "My Medications"),
+            ],
+            indicatorColor: Colors.white, // white underline to match theme
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
           ),
           actions: const [
             ProfileMenuButton(),
