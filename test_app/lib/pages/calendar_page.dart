@@ -40,6 +40,20 @@ class _CalendarPageState extends State<CalendarPage> {
  * ########################################
  */
 
+  Color parseColor(String? hexColor) {
+    if (hexColor == null || hexColor.isEmpty) return Colors.blue.shade100; // fallback
+
+    // Remove # if present
+    final hex = hexColor.replaceAll('#', '');
+
+    // Add alpha FF if missing
+    final buffer = StringBuffer();
+    if (hex.length == 6) buffer.write('FF'); // full opacity
+    buffer.write(hex);
+
+    return Color(int.parse(buffer.toString(), radix: 16));
+  }
+
 Future<List<Caregiver>> fetchCaregivers(bool isPatient) async {
   final supabase = Supabase.instance.client;
   final currentUser = supabase.auth.currentUser!;
@@ -66,7 +80,7 @@ Future<List<Caregiver>> fetchCaregivers(bool isPatient) async {
       final patientId = relation['patient_id'];
       response = await supabase
           .from('CareRelation')
-          .select('user_id, profile:user_id (name)')
+          .select('user_id, profile:user_id (name, color)')
           .eq('patient_id', patientId);
     }
   }
@@ -75,7 +89,7 @@ Future<List<Caregiver>> fetchCaregivers(bool isPatient) async {
   final formatted_caregivers = response.map((row) => Caregiver(
     id: row['user_id'],
     name: row['profile']?['name'] ?? '',
-    color: Colors.blue,
+    color: parseColor(row['profile']?['color']),
   )).toList();
   return formatted_caregivers;
 }
