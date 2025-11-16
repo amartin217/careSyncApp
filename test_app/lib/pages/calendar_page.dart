@@ -60,6 +60,20 @@ Color hexToColor(String code) {
  * ########################################
  */
 
+  Color parseColor(String? hexColor) {
+    if (hexColor == null || hexColor.isEmpty) return Colors.blue.shade100; // fallback
+
+    // Remove # if present
+    final hex = hexColor.replaceAll('#', '');
+
+    // Add alpha FF if missing
+    final buffer = StringBuffer();
+    if (hex.length == 6) buffer.write('FF'); // full opacity
+    buffer.write(hex);
+
+    return Color(int.parse(buffer.toString(), radix: 16));
+  }
+
 Future<List<Caregiver>> fetchCaregivers(bool isPatient) async {
   final supabase = Supabase.instance.client;
   final currentUser = supabase.auth.currentUser!;
@@ -96,7 +110,7 @@ Future<List<Caregiver>> fetchCaregivers(bool isPatient) async {
   final formatted_caregivers = response.map((row) => Caregiver(
     id: row['user_id'],
     name: row['profile']?['name'] ?? '',
-    color: hexToColor(row['profile']?['color'] ?? Colors.grey), // ✅ access color from profile table,
+    color: parseColor(row['profile']?['color']),
   )).toList();
   print("about to return");
   return formatted_caregivers;
