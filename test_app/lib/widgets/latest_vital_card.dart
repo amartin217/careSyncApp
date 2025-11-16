@@ -8,7 +8,7 @@ class LatestVitalCard extends StatelessWidget {
   final String timeAgo;
   final IconData icon;
   final Color iconColor;
-  final VoidCallback onTap;
+  final VoidCallback onTap; // FIX 4: Ensure onTap is included and required
 
   const LatestVitalCard({
     super.key,
@@ -19,13 +19,13 @@ class LatestVitalCard extends StatelessWidget {
     required this.timeAgo,
     required this.icon,
     required this.iconColor,
-    required this.onTap,
+    required this.onTap, // It is correctly required here
   });
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: onTap,
+      onTap: onTap, // Used here
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 8.0),
         margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
@@ -50,27 +50,26 @@ class LatestVitalCard extends StatelessWidget {
                 color: iconColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(icon, color: iconColor),
+              child: Icon(
+                icon,
+                color: iconColor,
+                size: 24,
+              ),
             ),
             const SizedBox(width: 12),
+            // Middle Column (Title and Range)
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     'Normal: $normalRange',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                   ),
                 ],
               ),

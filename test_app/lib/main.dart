@@ -7,8 +7,13 @@ import 'pages/calendar_page.dart';
 import 'pages/messaging_page.dart';
 import 'pages/link_patient_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:provider/provider.dart';
-import 'pages/user_provider.dart';
+
+import 'pages/vitals_config_page.dart';
+import 'models/vital.dart';
+import 'models/vital_timeslot.dart';
+import 'models/vital_reading.dart';
+import '../widgets/profile_menu.dart';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,13 +22,7 @@ Future<void> main() async {
     url: 'https://kslxhihlmviquoetrpjh.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtzbHhoaWhsbXZpcXVvZXRycGpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NDAxMTcsImV4cCI6MjA3NTUxNjExN30.g1yYb5JHMIvN6DHdw0WQ_TAAyWL-oEHTEPazZukoGjc',
   );
-  // runApp(const CaregiverSupportApp());
-  runApp(
-    ChangeNotifierProvider(
-      create: (_) => UserProvider()..loadUser(), // load user once at start
-      child: const CaregiverSupportApp(),
-    ),
-  );
+  runApp(const CaregiverSupportApp());
 }
 
 class CaregiverSupportApp extends StatelessWidget {
@@ -34,12 +33,62 @@ class CaregiverSupportApp extends StatelessWidget {
     return MaterialApp(
       title: 'Caregiver Support',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
         useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF5C7C9D), // muted steel blue
+          brightness: Brightness.light,
+        ),
+        scaffoldBackgroundColor: const Color(0xFFF3F6F8), // soft gray-blue background
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          foregroundColor: Color(0xFF1E2D3D),
+          elevation: 0,
+          centerTitle: true,
+          titleTextStyle: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1E2D3D),
+          ),
+        ),
+        cardTheme: CardTheme(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          color: Colors.white,
+          elevation: 2,
+          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF6C8DA7), // soft blue-gray
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            textStyle: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+            ),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          hintStyle: const TextStyle(color: Colors.black38),
+        ),
+        textTheme: const TextTheme(
+          bodyMedium: TextStyle(color: Color(0xFF2E3A4A)),
+        ),
       ),
       home: const AuthGate(),
     );
   }
+
 }
 
 class AuthGate extends StatelessWidget {
@@ -116,11 +165,11 @@ class _LoginPageState extends State<LoginPage> {
           children: [
             TextField(
               controller: emailController,
-              decoration: const InputDecoration(labelText: 'Email *'),
+              decoration: const InputDecoration(labelText: 'Email'),
             ),
             TextField(
               controller: passwordController,
-              decoration: const InputDecoration(labelText: 'Password *'),
+              decoration: const InputDecoration(labelText: 'Password'),
               obscureText: true,
             ),
             const SizedBox(height: 20),
@@ -195,48 +244,20 @@ class _SignUpPageState extends State<SignUpPage> {
           children: [
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(labelText: 'Full Name *'),
+              decoration: const InputDecoration(labelText: 'Full Name'),
             ),
             TextField(
               controller: emailController,
-              decoration: const InputDecoration(labelText: 'Email *'),
+              decoration: const InputDecoration(labelText: 'Email'),
             ),
             TextField(
               controller: passwordController,
-              decoration: const InputDecoration(
-                labelText: 'Password *',
-              ),
+              decoration: const InputDecoration(labelText: 'Password'),
               obscureText: true,
-              onChanged: (_) => setState(() {}), // triggers rebuild for password validation
             ),
-            const SizedBox(height: 8),
-            Builder(builder: (context) {
-              final pw = passwordController.text;
-              final meetsRequirement = pw.length >= 6;
-              return pw.isEmpty
-                  ? const SizedBox.shrink()
-                  : Row(
-                      children: [
-                        Icon(
-                          meetsRequirement ? Icons.check_circle : Icons.error,
-                          color: meetsRequirement ? Colors.green : Colors.red,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          meetsRequirement
-                              ? 'Password meets requirements'
-                              : 'Password must be at least 6 characters',
-                          style: TextStyle(
-                            color: meetsRequirement ? Colors.green : Colors.red,
-                          ),
-                        ),
-                      ],
-                    );
-            }),
             const SizedBox(height: 24),
             const Text(
-              'Are you a patient? *',
+              'Are you a patient?',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 8),
@@ -313,6 +334,152 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 }
 
+
+// ---  VITALS STATE MANAGEMENT WIDGET ---
+class VitalsScreen extends StatefulWidget {
+  const VitalsScreen({super.key});
+
+  @override
+  State<VitalsScreen> createState() => _VitalsScreenState();
+}
+
+class _VitalsScreenState extends State<VitalsScreen> {
+  // Mock In-Memory Data Store for Vitals
+  List<Vital> _vitals = [
+    Vital(id: 'v1', name: 'Blood Pressure', normalRange: '90-120/60-80 mmHg', unit: 'mmHg', icon: Icons.favorite, iconColor: const Color(0xFFE57373)), // Red
+    Vital(id: 'v2', name: 'Heart Rate', normalRange: '60-100 bpm', unit: 'bpm', icon: Icons.monitor_heart, iconColor: const Color(0xFF64B5F6)), // Blue
+    Vital(id: 'v3', name: 'Temperature', normalRange: '97.0-99.0 °F', unit: '°F', icon: Icons.thermostat, iconColor: const Color(0xFFFFB74D)), // Orange
+  ];
+  
+  List<VitalTimeslot> _timeslots = [
+    const VitalTimeslot(id: 't1', label: 'Morning (7:00 AM)'),
+    const VitalTimeslot(id: 't2', label: 'Evening (9:00 PM)'),
+  ];
+
+  // Placeholder for latest readings
+  List<VitalReading> _readings = [
+    VitalReading(id: 'r1', vitalId: 'v1', value: 120.0, timestamp: DateTime.now().subtract(const Duration(hours: 2)), systolic: 125, diastolic: 85, unit: 'mmHg'),
+    VitalReading(id: 'r2', vitalId: 'v2', value: 75.0, timestamp: DateTime.now().subtract(const Duration(hours: 2)), unit: 'bpm'),
+  ];
+
+  // --- CRUD METHODS (Simplifed in-memory for now) ---
+  void _addVital(Vital vital) {
+    setState(() {
+      // Simple mock ID generation
+      final newId = 'v${_vitals.length + 1}';
+      _vitals.add(vital.copyWith(id: newId));
+    });
+  }
+
+  void _updateVital(String id, Vital updatedVital) {
+    setState(() {
+      _vitals = _vitals.map((v) => v.id == id ? updatedVital : v).toList();
+    });
+  }
+
+  void _deleteVital(String id) {
+    setState(() {
+      _vitals.removeWhere((v) => v.id == id);
+    });
+  }
+
+  void _addReading(VitalReading reading) {
+    setState(() {
+      _readings.add(reading);
+    });
+  }
+
+  void _addTimeslot(VitalTimeslot slot) {
+    setState(() {
+      final newId = 't${_timeslots.length + 1}';
+      _timeslots.add(VitalTimeslot(id: newId, label: slot.label));
+    });
+  }
+
+  void _deleteTimeslot(String id) {
+    setState(() {
+      _timeslots.removeWhere((t) => t.id == id);
+    });
+  }
+@override
+  Widget build(BuildContext context) {
+    // Determine the latest reading for each vital type
+    final Map<String, VitalReading> latestReadingsMap = {};
+    for (var reading in _readings) {
+      // Only keep the most recent reading for each vitalId
+      if (!latestReadingsMap.containsKey(reading.vitalId) || reading.timestamp.isAfter(latestReadingsMap[reading.vitalId]!.timestamp)) {
+        latestReadingsMap[reading.vitalId!] = reading;
+      }
+    }
+    
+    // Combine the Vital model with its latest reading for the VitalsPage
+    final List<Map<String, dynamic>> vitalDataForPage = _vitals.map((vital) {
+      final latestReading = latestReadingsMap[vital.id];
+      
+      // Default values if no reading exists
+      String currentValue = latestReading?.systolic != null 
+          ? '${latestReading!.systolic}/${latestReading.diastolic}' 
+          : latestReading?.value.toStringAsFixed(1) ?? '--';
+      String unit = latestReading?.unit ?? vital.unit;
+      String timeAgo = latestReading != null 
+          ? 'Log at ${latestReading.timestamp.hour}:${latestReading.timestamp.minute.toString().padLeft(2, '0')}' 
+          : 'No recent reading';
+
+      return {
+        'id': vital.id,
+        'title': vital.name,
+        'normalRange': vital.normalRange,
+        'currentValue': currentValue,
+        'unit': unit,
+        'timeAgo': timeAgo,
+        'icon': vital.icon,
+        'iconColor': vital.iconColor,
+      };
+    }).toList();
+
+
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Vitals'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Latest Readings'),
+              Tab(text: 'Configuration'),
+            ],
+          ),
+          actions: const [
+            ProfileMenuButton(),
+          ],
+        ),
+        body: TabBarView(
+          children: [
+            // Tab 1: Vitals Page (The Dashboard/Timeline)
+            VitalsPage(
+              vitalData: vitalDataForPage,
+              vitals: _vitals,
+              timeslots: _timeslots,
+              addReading: _addReading,
+              addTimeslot: _addTimeslot,
+            ),
+            // Tab 2: Vitals Configuration Page
+            VitalsConfigPage(
+              vitals: _vitals,
+              addVital: _addVital,
+              deleteVital: _deleteVital,
+              updateVital: _updateVital,
+              timeslots: _timeslots,
+              addTimeslot: _addTimeslot,
+              deleteTimeslot: _deleteTimeslot,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+}
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
 
@@ -326,7 +493,7 @@ class _MainPageState extends State<MainPage> {
   final List<Widget> _pages = [
     DashboardPage(),
     MedicationPage(),
-    VitalsPage(),
+    const VitalsScreen(),
     CalendarPage(),
     MessagingPage(),
   ];
@@ -336,6 +503,7 @@ class _MainPageState extends State<MainPage> {
       _selectedIndex = index;
     });
   }
+
 
   @override
   Widget build(BuildContext context) {
