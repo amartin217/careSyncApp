@@ -242,7 +242,7 @@ class _MedicationPageState extends State<MedicationPage> {
     setState(() {
       medications = medications.map((m) {
         if (m.id == id) {
-          return m.copyWith(timeslotIds: timeslotIds);
+          return m.copyWith(timeslotIds: timeslotIds, name: name, dosage: dosage, notes: notes);
         }
         return m;
       }).toList();

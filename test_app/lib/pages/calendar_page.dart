@@ -422,14 +422,29 @@ Widget build(BuildContext context) {
   return Scaffold(
     resizeToAvoidBottomInset: false, // prevents automatic resizing when keyboard appears
     appBar: AppBar(
-      title: Text("Care Schedule"),
-      centerTitle: true,
-      backgroundColor: Theme.of(context).primaryColor,
-      foregroundColor: Colors.white,
-      actions: const [
-        ProfileMenuButton(),
-      ],
-    ),
+          automaticallyImplyLeading: false,
+          title: const Text("Care Schedule"),
+          centerTitle: true,
+          foregroundColor: Colors.white,
+          titleTextStyle: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+          elevation: 0,
+          flexibleSpace: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF6C8DA7), Color(0xFF5C7C9D)], // soft gradient
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
+          actions: const [
+            ProfileMenuButton(),
+          ],
+        ),
     body: SingleChildScrollView(
       child: Column(
         children: [
