@@ -103,7 +103,6 @@ Future<List<Caregiver>> fetchCaregivers(bool isPatient) async {
           .select('user_id, profile:user_id (name, color)')
           .eq('patient_id', patientId);
     }
-
   }
   print("number of caregivers: ${response.length}");
 
