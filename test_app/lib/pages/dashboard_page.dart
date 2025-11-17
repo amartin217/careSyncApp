@@ -258,8 +258,7 @@ class DashboardPage extends StatelessWidget {
           actions: const [
             ProfileMenuButton(),
           ],
-),
-
+        ),
           body: SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(16.0),

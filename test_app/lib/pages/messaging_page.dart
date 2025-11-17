@@ -213,12 +213,29 @@ class _MessagingPageState extends State<MessagingPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Messaging"),
-        centerTitle: true,
-        backgroundColor: Theme.of(context).primaryColor,
-        foregroundColor: Colors.white,
-        actions: const [ProfileMenuButton()],
-      ),
+          automaticallyImplyLeading: false,
+          title: const Text("Messages"),
+          centerTitle: true,
+          foregroundColor: Colors.white,
+          titleTextStyle: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+          elevation: 0,
+          flexibleSpace: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF6C8DA7), Color(0xFF5C7C9D)], // soft gradient
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
+          actions: const [
+            ProfileMenuButton(),
+          ],
+        ),
       body: Column(
         children: [
           Expanded(
@@ -245,8 +262,19 @@ class _MessagingPageState extends State<MessagingPage> {
                     margin: const EdgeInsets.symmetric(vertical: 8),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: caregiver.color,
-                      borderRadius: BorderRadius.circular(8),
+                      color: caregiver.color.withOpacity(0.1),
+                      //borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: caregiver.color, width: 1.5),
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(16),
+                        topRight: const Radius.circular(16),
+                        bottomLeft: caregiver.id == currentUserId
+                            ? const Radius.circular(16)
+                            : const Radius.circular(4),             // "tail" side
+                        bottomRight: caregiver.id == currentUserId
+                            ? const Radius.circular(4)
+                            : const Radius.circular(16),            // "tail" side
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
