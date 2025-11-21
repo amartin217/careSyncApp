@@ -8,6 +8,7 @@ import '../widgets/profile_menu.dart';
 final supabase = Supabase.instance.client;
 
 class CalendarPage extends StatefulWidget {
+
   const CalendarPage({super.key});
 
   @override
@@ -1359,9 +1360,14 @@ Widget _buildAppointmentCard(CaregiverAppointment appointment, Caregiver? caregi
 
                   // 1️⃣ Update local state optimistically
                   final index = appointments.indexWhere((a) => a.id == appointment.id);
-                  setState(() {
-                    appointments[index] = updatedAppointment;
-                  });
+                  if(index!= -1){
+                    setState(() {
+                      appointments[index] = updatedAppointment;
+                    });
+                  }
+                  else{
+                    print("Error: could not find appointment to update locally.");
+                  }
 
                   // 2️⃣ Update backend
                   try {

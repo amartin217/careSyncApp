@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import '../widgets/stat_card.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'link_patient_page.dart';
 import '../widgets/profile_menu.dart';
 import 'package:intl/intl.dart';
 
@@ -27,8 +25,8 @@ class DashboardPage extends StatelessWidget {
 
   Color _getMedColor(String medId) {
     if (!medColors.containsKey(medId)) {
-      final index = medColors.length % colors.length; // sequential assignment
-      medColors[medId] = colors[index].shade300; // Store the specific shade
+      final index = medColors.length % colors.length;
+      medColors[medId] = colors[index].shade300;
     }
     return medColors[medId]!;
   }
@@ -43,7 +41,6 @@ class DashboardPage extends StatelessWidget {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return null;
 
-    // Fetch current user's profile
     final profile = await supabase
         .from('Profile')
         .select('user_id, is_patient, name')
@@ -97,25 +94,20 @@ class DashboardPage extends StatelessWidget {
     final today = DateTime.now().toIso8601String().split('T')[0];
     final userId = supabase.auth.currentUser!.id;
 
-    // Determine patient
     final relation = await supabase
         .from('CareRelation')
         .select('patient_id')
         .eq('user_id', userId)
         .maybeSingle();
+
     final patientId =
         relation != null ? relation['patient_id'] as String : userId;
 
-    // Fetch data
-    final timeslots = await supabase
-        .from('Timeslot')
-        .select()
-        .eq('patient_id', patientId);
+    final timeslots =
+        await supabase.from('Timeslot').select().eq('patient_id', patientId);
 
-    final meds = await supabase
-        .from('Medication')
-        .select()
-        .eq('patient_id', patientId);
+    final meds =
+        await supabase.from('Medication').select().eq('patient_id', patientId);
 
     final logs = await supabase
         .from('MedicationLog')
@@ -146,8 +138,7 @@ class DashboardPage extends StatelessWidget {
                 l['medication_id'] == m['id'] && l['timeslot_id'] == slotId)
             .toList();
         final log = matchingLogs.isNotEmpty ? matchingLogs.first : null;
-        final isTaken =
-            log != null ? (log['is_taken'] as bool? ?? false) : false;
+        final isTaken = log != null ? (log['is_taken'] as bool? ?? false) : false;
 
         final item = {
           'id': m['id'],
@@ -160,6 +151,7 @@ class DashboardPage extends StatelessWidget {
 
         final slotMinutes = slotTime.hour * 60 + slotTime.minute;
         final nowMinutes = now.hour * 60 + now.minute;
+
         if (!isTaken && slotMinutes < nowMinutes) {
           missed.add(item);
         } else if (!isTaken && slotMinutes >= nowMinutes) {
@@ -185,7 +177,6 @@ class DashboardPage extends StatelessWidget {
     List<dynamic> events;
 
     if (isPatient) {
-      // Patient sees all their own upcoming events
       events = await supabase
           .from('Event')
           .select('event_id, name, start_datetime, end_datetime, description')
@@ -193,7 +184,6 @@ class DashboardPage extends StatelessWidget {
           .gte('start_datetime', now)
           .order('start_datetime', ascending: true);
     } else {
-      // Caregiver sees only their assigned events
       events = await supabase
           .from('Event')
           .select('event_id, name, start_datetime, end_datetime, description')
@@ -205,6 +195,39 @@ class DashboardPage extends StatelessWidget {
     return (events as List).map((e) => e as Map<String, dynamic>).toList();
   }
 
+  // -------------------
+  // SECTION CARD HELPER
+  // -------------------
+
+  Widget _sectionCard({
+    required String title,
+    required Widget child,
+    Color? color,
+  }) {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color ?? Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title,
+                style: const TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -235,206 +258,178 @@ class DashboardPage extends StatelessWidget {
         }
 
         return Scaffold(
-         appBar: AppBar(
-          automaticallyImplyLeading: false,
-          title: const Text("Dashboard"),
-          centerTitle: true,
-          foregroundColor: Colors.white,
-          titleTextStyle: const TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-          elevation: 0,
-          flexibleSpace: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF6C8DA7), Color(0xFF5C7C9D)], // soft gradient
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            title: const Text("Dashboard"),
+            centerTitle: true,
+            foregroundColor: Colors.white,
+            titleTextStyle: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+            elevation: 0,
+            flexibleSpace: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF6C8DA7), Color(0xFF5C7C9D)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
             ),
+            actions: const [ProfileMenuButton()],
           ),
-          actions: const [
-            ProfileMenuButton(),
-          ],
-        ),
           body: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start, // Align content left
-                children: [
-                  // 👋 Personalized welcome section
-                  Text(
-                    "Welcome, $userName!👋",
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("Welcome, $userName!👋",
                     style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                          fontWeight: FontWeight.w900,
-                          color: Theme.of(context).primaryColorDark,
+                        fontWeight: FontWeight.w900,
+                        color: Theme.of(context).primaryColorDark)),
+                const SizedBox(height: 4),
+                Text(welcomeLine,
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 24),
+
+                if (isPatient)
+                  Column(
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.blue.shade200),
                         ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    welcomeLine,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 24),
-
-                  if (isPatient) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.blue.shade200),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Your Patient Share Code:",
-                            style: Theme.of(context).textTheme.titleSmall,
-                          ),
-                          const SizedBox(height: 4),
-                          SelectableText(
-                            data['code'] ?? 'N/A',
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.5,
-                              color: Colors.deepOrange,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-
-                  if (!isPatient && !hasLinkedPatient)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16, bottom: 16),
-                      child: Center(
-                        child: Text(
-                          "No patient linked yet. Use the link page to connect with a patient.",
-                          style: TextStyle(color: Colors.black54, fontStyle: FontStyle.italic),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    )
-                  else
-                    FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
-                      future: _fetchMedications(),
-                      builder: (context, medsSnapshot) {
-                        if (medsSnapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          // Only show indicator for this section
-                          return const Center(
-                              child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 40.0),
-                            child: CircularProgressIndicator(),
-                          ));
-                        }
-
-                        final missed = medsSnapshot.data!['missed']!;
-                        final upcoming = medsSnapshot.data!['upcoming']!;
-
-                        return Column(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (missed.isNotEmpty) ...[
-                              Row(
-                                children: [
-                                  const Text(
-                                    "⚠️ Missed Doses",
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.red,
-                                    ),
-                                  ),
-                                ],
+                            Text("Your Patient Share Code:",
+                                style: Theme.of(context).textTheme.titleSmall),
+                            const SizedBox(height: 4),
+                            SelectableText(
+                              data['code'] ?? 'N/A',
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.5,
+                                color: Colors.deepOrange,
                               ),
-                              const SizedBox(height: 12),
-                              Wrap(
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+
+                if (!isPatient && !hasLinkedPatient)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16, bottom: 16),
+                    child: Center(
+                      child: Text(
+                        "No patient linked yet. Use the link page to connect with a patient.",
+                        style: TextStyle(
+                            color: Colors.black54,
+                            fontStyle: FontStyle.italic),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  )
+                else
+                  FutureBuilder<
+                      Map<String, List<Map<String, dynamic>>>>(
+                    future: _fetchMedications(),
+                    builder: (context, medsSnapshot) {
+                      if (!medsSnapshot.hasData) {
+                        return const Center(
+                            child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 40.0),
+                          child: CircularProgressIndicator(),
+                        ));
+                      }
+
+                      final missed = medsSnapshot.data!['missed']!;
+                      final upcoming = medsSnapshot.data!['upcoming']!;
+
+                      return Column(
+                        children: [
+                          // MISSED DOSES CARD -----------------------
+                          if (missed.isNotEmpty)
+                            _sectionCard(
+                              title: "⚠️ Missed Doses",
+                              color: Colors.red.shade50,
+                              child: Wrap(
                                 spacing: 10,
                                 runSpacing: 10,
                                 children: missed
                                     .map((m) => _buildMedTile(context, m))
                                     .toList(),
                               ),
-                              const SizedBox(height: 32),
-                            ],
-                            const Text(
-                              "💊 Today's Upcoming Medications",
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
                             ),
-                            const SizedBox(height: 12),
-                            if (upcoming.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8.0),
-                                child: Text("No upcoming medications today. You are all caught up!", style: TextStyle(color: Colors.black54)),
-                              )
-                            else
-                              Wrap(
-                                spacing: 10,
-                                runSpacing: 10,
-                                children: upcoming
-                                    .map((m) => _buildMedTile(context, m))
-                                    .toList(),
-                              ),
-                            const SizedBox(height: 32),
-                            // Upcoming Events Section
-                            FutureBuilder<List<Map<String, dynamic>>>(
-                              future:
-                                  _fetchUpcomingEvents(isPatient: isPatient),
-                              builder: (context, eventSnapshot) {
-                                if (eventSnapshot.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return const Center(
-                                      child: Padding(
-                                    padding:
-                                        EdgeInsets.symmetric(vertical: 20.0),
-                                    child: CircularProgressIndicator(),
-                                  ));
-                                }
 
-                                final events = eventSnapshot.data ?? [];
+                          const SizedBox(height: 24),
 
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      "🗓️ Upcoming Appointments",
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    if (events.isEmpty)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 8.0),
-                                        child: Text("No upcoming appointments.", style: TextStyle(color: Colors.black54)),
+                          // UPCOMING MEDS CARD ---------------------
+                          _sectionCard(
+                            title: "💊 Today's Upcoming Medications",
+                            child: upcoming.isEmpty
+                                ? Text(
+                                    "No upcoming medications today. You are all caught up!",
+                                    style:
+                                        TextStyle(color: Colors.black54),
+                                  )
+                                : Wrap(
+                                    spacing: 10,
+                                    runSpacing: 10,
+                                    children: upcoming
+                                        .map((m) => _buildMedTile(context, m))
+                                        .toList(),
+                                  ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          // UPCOMING EVENTS CARD -------------------
+                          FutureBuilder<List<Map<String, dynamic>>>(
+                            future: _fetchUpcomingEvents(isPatient: isPatient),
+                            builder: (context, eventSnapshot) {
+                              if (!eventSnapshot.hasData) {
+                                return const Center(
+                                    child: Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 20.0),
+                                  child: CircularProgressIndicator(),
+                                ));
+                              }
+
+                              final events = eventSnapshot.data!;
+
+                              return _sectionCard(
+                                title: "🗓️ Upcoming Appointments",
+                                child: events.isEmpty
+                                    ? Text(
+                                        "No upcoming appointments.",
+                                        style:
+                                            TextStyle(color: Colors.black54),
                                       )
-                                    else
-                                      ...events
-                                          .map((e) => _buildEventTile(context, e))
-                                          .toList(),
-                                  ],
-                                );
-                              },
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                ],
-              ),
+                                    : Column(
+                                        children: events
+                                            .map((e) =>
+                                                _buildEventTile(context, e))
+                                            .toList(),
+                                      ),
+                              );
+                            },
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+              ],
             ),
           ),
         );
@@ -442,33 +437,36 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  // --- UI WIDGETS ---
+  // ------------------------
+  // MED TILE + EVENT TILE UI
+  // ------------------------
 
   Widget _buildMedTile(BuildContext context, Map<String, dynamic> med) {
     final time = med['time'] as TimeOfDay;
     final timeStr = time.format(context);
     final medColor = _getMedColor(med['id']);
     final medDarkColor = _getMedDarkColor(med['id']);
-    
-    // Check if missed to apply an error style
+
     final isMissed = med['isTaken'] == false &&
-        (time.hour * 60 + time.minute) < (TimeOfDay.now().hour * 60 + TimeOfDay.now().minute);
+        (time.hour * 60 + time.minute) <
+            (TimeOfDay.now().hour * 60 + TimeOfDay.now().minute);
 
     return Card(
       elevation: 2,
       margin: const EdgeInsets.all(0),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        // Use a more distinct border for missed items
         side: BorderSide(
-          color: isMissed ? Colors.red.shade400 : medColor.withOpacity(0.5), // Fixed shade error
+          color:
+              isMissed ? Colors.red.shade400 : medColor.withOpacity(0.5),
           width: 1.5,
         ),
       ),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isMissed ? Colors.red.shade50 : medColor.withOpacity(0.1),
+          color:
+              isMissed ? Colors.red.shade50 : medColor.withOpacity(0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -478,19 +476,21 @@ class DashboardPage extends StatelessWidget {
             Text(
               med['name'] ?? 'Unnamed Medication',
               style: Theme.of(context).textTheme.titleSmall!.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
+                  fontWeight: FontWeight.bold, color: Colors.black87),
             ),
             const SizedBox(height: 4),
             Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.access_time, size: 16, color: isMissed ? Colors.red.shade700 : medDarkColor), 
+                Icon(Icons.access_time,
+                    size: 16,
+                    color: isMissed
+                        ? Colors.red.shade700
+                        : medDarkColor),
                 const SizedBox(width: 4),
                 Text(
                   "${med['label'] ?? 'Dose'} ($timeStr)",
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -508,9 +508,9 @@ class DashboardPage extends StatelessWidget {
   Widget _buildEventTile(BuildContext context, Map<String, dynamic> event) {
     final start = DateTime.parse(event['start_datetime']);
     final end = DateTime.parse(event['end_datetime']);
-    final dateStr = DateFormat('EEE, MMM d').format(start); // Date only
+    final dateStr = DateFormat('EEE, MMM d').format(start);
     final timeStr =
-        "${DateFormat('h:mm a').format(start)} - ${DateFormat('h:mm a').format(end)}"; // Time range only
+        "${DateFormat('h:mm a').format(start)} - ${DateFormat('h:mm a').format(end)}";
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -524,11 +524,8 @@ class DashboardPage extends StatelessWidget {
             color: Colors.teal.shade100,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: const Icon(
-            Icons.calendar_month,
-            size: 28,
-            color: Colors.teal,
-          ),
+          child: const Icon(Icons.calendar_month,
+              size: 28, color: Colors.teal),
         ),
         title: Text(
           event['name'] ?? 'Untitled Event',
@@ -544,11 +541,15 @@ class DashboardPage extends StatelessWidget {
             Text(
               dateStr,
               style: const TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
             ),
             Text(
               timeStr,
-              style: const TextStyle(fontSize: 12, color: Colors.black54),
+              style:
+                  const TextStyle(fontSize: 12, color: Colors.black54),
             ),
             if (event['description'] != null &&
                 (event['description'] as String).trim().isNotEmpty)
