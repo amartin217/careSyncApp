@@ -7,11 +7,13 @@ import 'pages/calendar_page.dart';
 import 'pages/messaging_page.dart';
 import 'pages/link_patient_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
-import 'pages/vitals_config_page.dart';
-import 'models/vital.dart';
+import 'pages/vitals_config_page.dart'; // Vitals Configuration Tab
+import 'models/vitals_data_models.dart'; // VitalType, VitalReading
 import 'models/vital_timeslot.dart';
-import 'models/vital_reading.dart';
+import '../widgets/profile_menu.dart';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,13 +33,64 @@ class CaregiverSupportApp extends StatelessWidget {
     return MaterialApp(
       title: 'Caregiver Support',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
         useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF5C7C9D), // muted steel blue
+          brightness: Brightness.light,
+        ),
+        scaffoldBackgroundColor: const Color(0xFFF3F6F8), // soft gray-blue background
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          foregroundColor: Color(0xFF1E2D3D),
+          elevation: 0,
+          centerTitle: true,
+          titleTextStyle: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1E2D3D),
+          ),
+        ),
+        cardTheme: CardThemeData(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          color:Colors.white,
+          elevation: 2,
+          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF6C8DA7), // soft blue-gray
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            textStyle: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+            ),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          hintStyle: const TextStyle(color: Colors.black38),
+        ),
+        textTheme: const TextTheme(
+          bodyMedium: TextStyle(color: Color(0xFF2E3A4A)),
+        ),
       ),
       home: const AuthGate(),
     );
   }
+
 }
+
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -283,7 +336,7 @@ class _SignUpPageState extends State<SignUpPage> {
 }
 
 
-// ---  VITALS STATE MANAGEMENT WIDGET ---
+
 class VitalsScreen extends StatefulWidget {
   const VitalsScreen({super.key});
 
@@ -292,100 +345,102 @@ class VitalsScreen extends StatefulWidget {
 }
 
 class _VitalsScreenState extends State<VitalsScreen> {
-  // Mock In-Memory Data Store for Vitals
-  List<Vital> _vitals = [
-    Vital(id: 'v1', name: 'Blood Pressure', normalRange: '90-120/60-80 mmHg', unit: 'mmHg', icon: Icons.favorite, iconColor: const Color(0xFFE57373)), // Red
-    Vital(id: 'v2', name: 'Heart Rate', normalRange: '60-100 bpm', unit: 'bpm', icon: Icons.monitor_heart, iconColor: const Color(0xFF64B5F6)), // Blue
-    Vital(id: 'v3', name: 'Temperature', normalRange: '97.0-99.0 °F', unit: '°F', icon: Icons.thermostat, iconColor: const Color(0xFFFFB74D)), // Orange
-  ];
-  
-  List<VitalTimeslot> _timeslots = [
-    const VitalTimeslot(id: 't1', label: 'Morning (7:00 AM)'),
-    const VitalTimeslot(id: 't2', label: 'Evening (9:00 PM)'),
-  ];
+  final Uuid uuid = const Uuid();
 
-  // Placeholder for latest readings
-  List<VitalReading> _readings = [
-    VitalReading(id: 'r1', vitalId: 'v1', value: 120.0, timestamp: DateTime.now().subtract(const Duration(hours: 2)), systolic: 125, diastolic: 85, unit: 'mmHg'),
-    VitalReading(id: 'r2', vitalId: 'v2', value: 75.0, timestamp: DateTime.now().subtract(const Duration(hours: 2)), unit: 'bpm'),
-  ];
+  // Initial Placeholder VitalTypes (with IDs)
+  // These IDs are used to link the readings to the type
+  final String bpVitalId = const Uuid().v4();
+  final String hrVitalId = const Uuid().v4();
 
-  // --- CRUD METHODS (Simplifed in-memory for now) ---
-  void _addVital(Vital vital) {
+  late List<VitalType> _configuredVitals;
+  late List<VitalReading> _readings;
+  late List<VitalTimeslot> _timeslots;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize Vitals and Readings
+    _configuredVitals = [
+      VitalType(id: bpVitalId, name: 'Blood Pressure', normalRange: '120/80', unit: 'mmHg'),
+      VitalType(id: hrVitalId, name: 'Heart Rate', normalRange: '60-100', unit: 'BPM'),
+      VitalType(id: const Uuid().v4(), name: 'Temperature', normalRange: '97.6-99.6', unit: '°F'),
+    ];
+
+    // Initialize Readings (FIX: Use vitalId instead of vitalName/type)
+    _readings = [
+      VitalReading(
+        id: uuid.v4(),
+        vitalId: bpVitalId, // FIX: Use vitalId
+        value: '125/82',
+        unit: 'mmHg',
+        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
+      ),
+      VitalReading(
+        id: uuid.v4(),
+        vitalId: hrVitalId, // FIX: Use vitalId
+        value: '75',
+        unit: 'BPM',
+        timestamp: DateTime.now().subtract(const Duration(hours: 1)),
+      ),
+    ];
+
+    // Initialize Timeslots
+    _timeslots = [
+      VitalTimeslot(id: uuid.v4(), label: 'Morning', time: const TimeOfDay(hour: 8, minute: 0)),
+      VitalTimeslot(id: uuid.v4(), label: 'Evening', time: const TimeOfDay(hour: 18, minute: 0)),
+    ];
+  }
+
+  // --- VitalType Management Functions ---
+  void _addVital(VitalType vital) {
     setState(() {
-      // Simple mock ID generation
-      final newId = 'v${_vitals.length + 1}';
-      _vitals.add(vital.copyWith(id: newId));
+      _configuredVitals = [..._configuredVitals, vital];
     });
   }
 
-  void _updateVital(String id, Vital updatedVital) {
+  void _updateVital(String id, VitalType updatedVital) {
     setState(() {
-      _vitals = _vitals.map((v) => v.id == id ? updatedVital : v).toList();
+      _configuredVitals = _configuredVitals.map((v) => v.id == id ? updatedVital : v).toList();
     });
   }
 
   void _deleteVital(String id) {
     setState(() {
-      _vitals.removeWhere((v) => v.id == id);
+      _configuredVitals.removeWhere((v) => v.id == id);
+      // Also remove readings associated with the deleted vital
+      _readings.removeWhere((r) => r.vitalId == id);
     });
   }
 
+  // --- VitalReading Management Functions ---
   void _addReading(VitalReading reading) {
     setState(() {
-      _readings.add(reading);
+      _readings = [..._readings, reading];
     });
   }
 
+  // --- VitalTimeslot Management Functions ---
   void _addTimeslot(VitalTimeslot slot) {
     setState(() {
-      final newId = 't${_timeslots.length + 1}';
-      _timeslots.add(VitalTimeslot(id: newId, label: slot.label));
+      _timeslots = [..._timeslots, slot];
+    });
+  }
+
+  void _updateTimeslot(String id, VitalTimeslot updatedSlot) { // FIX: Added _updateTimeslot
+    setState(() {
+      _timeslots = _timeslots.map((s) => s.id == id ? updatedSlot : s).toList();
     });
   }
 
   void _deleteTimeslot(String id) {
     setState(() {
-      _timeslots.removeWhere((t) => t.id == id);
+      _timeslots.removeWhere((s) => s.id == id);
     });
   }
-@override
+
+ 
+  @override
   Widget build(BuildContext context) {
-    // Determine the latest reading for each vital type
-    final Map<String, VitalReading> latestReadingsMap = {};
-    for (var reading in _readings) {
-      // Only keep the most recent reading for each vitalId
-      if (!latestReadingsMap.containsKey(reading.vitalId) || reading.timestamp.isAfter(latestReadingsMap[reading.vitalId]!.timestamp)) {
-        latestReadingsMap[reading.vitalId!] = reading;
-      }
-    }
-    
-    // Combine the Vital model with its latest reading for the VitalsPage
-    final List<Map<String, dynamic>> vitalDataForPage = _vitals.map((vital) {
-      final latestReading = latestReadingsMap[vital.id];
-      
-      // Default values if no reading exists
-      String currentValue = latestReading?.systolic != null 
-          ? '${latestReading!.systolic}/${latestReading.diastolic}' 
-          : latestReading?.value.toStringAsFixed(1) ?? '--';
-      String unit = latestReading?.unit ?? vital.unit;
-      String timeAgo = latestReading != null 
-          ? 'Log at ${latestReading.timestamp.hour}:${latestReading.timestamp.minute.toString().padLeft(2, '0')}' 
-          : 'No recent reading';
-
-      return {
-        'id': vital.id,
-        'title': vital.name,
-        'normalRange': vital.normalRange,
-        'currentValue': currentValue,
-        'unit': unit,
-        'timeAgo': timeAgo,
-        'icon': vital.icon,
-        'iconColor': vital.iconColor,
-      };
-    }).toList();
-
-
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -393,30 +448,30 @@ class _VitalsScreenState extends State<VitalsScreen> {
           title: const Text('Vitals'),
           bottom: const TabBar(
             tabs: [
-              Tab(text: 'Latest Readings'),
-              Tab(text: 'Configuration'),
+              Tab(text: 'My Vitals', icon: Icon(Icons.favorite_border)),
+              Tab(text: 'Configuration', icon: Icon(Icons.settings)),
             ],
           ),
+          actions: [const ProfileMenuButton()],
         ),
         body: TabBarView(
           children: [
-            // Tab 1: Vitals Page (The Dashboard/Timeline)
+            // My Vitals Page (Summary & Timeline)
             VitalsPage(
-              vitalData: vitalDataForPage,
-              vitals: _vitals,
-              timeslots: _timeslots,
-              addReading: _addReading,
-              addTimeslot: _addTimeslot,
+              configuredVitals: _configuredVitals,
+              readings: _readings,
+              addReading: _addReading, // FIX: Corrected parameter name from onAddReading
             ),
-            // Tab 2: Vitals Configuration Page
+            // Configuration Page
             VitalsConfigPage(
-              vitals: _vitals,
-              addVital: _addVital,
-              deleteVital: _deleteVital,
-              updateVital: _updateVital,
+              configuredVitals: _configuredVitals,
+              onAddVital: _addVital,
+              onDeleteVital: _deleteVital,
+              onUpdateVital: _updateVital,
               timeslots: _timeslots,
-              addTimeslot: _addTimeslot,
-              deleteTimeslot: _deleteTimeslot,
+              onAddTimeslot: _addTimeslot,
+              onDeleteTimeslot: _deleteTimeslot,
+              onUpdateTimeslot: _updateTimeslot, // FIX: Added required parameter
             ),
           ],
         ),
@@ -425,6 +480,7 @@ class _VitalsScreenState extends State<VitalsScreen> {
   }
 
 }
+
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
 

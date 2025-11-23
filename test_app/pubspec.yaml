@@ -30,7 +30,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-    
+  intl: ^0.18.1
+
   supabase_flutter: ^2.0.0
   uuid: ^4.0.0 
 

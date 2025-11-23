@@ -1,385 +1,278 @@
 import 'package:flutter/material.dart';
-import 'dart:math';
-
-import '../models/vital.dart'; // Use the new model
+import 'package:uuid/uuid.dart';
+import '../models/vitals_data_models.dart';
 import '../models/vital_timeslot.dart';
 
 class VitalsConfigPage extends StatelessWidget {
-  final List<Vital> vitals;
-  final void Function(Vital vital) addVital;
-  final void Function(String id) deleteVital;
-  final void Function(String id, Vital vital) updateVital;
-
+  // Fix: Corrected type to VitalType
+  final List<VitalType> configuredVitals;
+  // Fix: Corrected type to VitalType
+  final Function(VitalType vital) onAddVital;
+  final Function(String id) onDeleteVital;
+  // Fix: Corrected type to VitalType
+  final Function(String id, VitalType updatedVital) onUpdateVital;
   final List<VitalTimeslot> timeslots;
-  final void Function(VitalTimeslot slot) addTimeslot;
-  final void Function(String id) deleteTimeslot;
-
+  final Function(VitalTimeslot slot) onAddTimeslot;
+  final Function(String id) onDeleteTimeslot;
+  final Function(String id, VitalTimeslot slot) onUpdateTimeslot; // Added update timeslot
 
   const VitalsConfigPage({
     super.key,
-    required this.vitals,
-    required this.addVital,
-    required this.deleteVital,
-    required this.updateVital,
+    required this.configuredVitals,
+    required this.onAddVital,
+    required this.onDeleteVital,
+    required this.onUpdateVital,
     required this.timeslots,
-    required this.addTimeslot,
-    required this.deleteTimeslot,
+    required this.onAddTimeslot,
+    required this.onDeleteTimeslot,
+    required this.onUpdateTimeslot, // Added update timeslot
   });
-
-  // --- VITAL CONFIG LOGIC ---\n
-  Future<void> _editVitalDialog(BuildContext context, Vital vital) async {
-    final TextEditingController nameController = TextEditingController(text: vital.name);
-    final TextEditingController rangeController = TextEditingController(text: vital.normalRange);
-    final TextEditingController unitController = TextEditingController(text: vital.unit); // New Unit Controller
-
-    final result = await showDialog<Vital>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Edit Vital Details'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Vital Name'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: rangeController,
-                decoration: const InputDecoration(labelText: 'Normal Range (e.g., 90-120/60-80)'),
-              ),
-              const SizedBox(height: 12),
-              TextField( // New Unit Input
-                controller: unitController,
-                decoration: const InputDecoration(labelText: 'Unit (e.g., mmHg, bpm, °F)'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(null),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                // Return the updated Vital object
-                Navigator.of(context).pop(
-                  vital.copyWith(
-                    name: nameController.text.trim(),
-                    normalRange: rangeController.text.trim(),
-                    unit: unitController.text.trim(), // Save the new unit
-                  ),
-                );
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (result != null) {
-      updateVital(vital.id, result);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${result.name} updated successfully.')),
-      );
-    }
-  }
-
-  // Helper function to handle adding a new vital
-  Future<void> _addVitalDialog(BuildContext context) async {
-    final TextEditingController nameController = TextEditingController();
-    final TextEditingController rangeController = TextEditingController();
-    final TextEditingController unitController = TextEditingController(); // New Unit Controller
-
-    final result = await showDialog<Vital>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Add New Vital'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Vital Name'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: rangeController,
-                decoration: const InputDecoration(labelText: 'Normal Range (e.g., 90-120/60-80)'),
-              ),
-              const SizedBox(height: 12),
-              TextField( // New Unit Input
-                controller: unitController,
-                decoration: const InputDecoration(labelText: 'Unit (e.g., mmHg, bpm, °F)'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(null),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (nameController.text.trim().isEmpty || unitController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Name and Unit are required.')),
-                  );
-                  return;
-                }
-                
-                // FIX 3: Passed the required 'unit' parameter when adding a new Vital.
-                // Since this is a new vital, we use placeholder icon/color which can be edited later.
-                final newVital = Vital(
-                  id: Random().nextInt(100000).toString(), // Mock ID
-                  name: nameController.text.trim(),
-                  normalRange: rangeController.text.trim(),
-                  unit: unitController.text.trim(), // Passed the new unit
-                  icon: Icons.monitor_heart_outlined,
-                  iconColor: Colors.blueGrey,
-                );
-                Navigator.of(context).pop(newVital);
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (result != null) {
-      addVital(result);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${result.name} added successfully.')),
-      );
-    }
-  }
-
-  // Helper function to handle adding a new timeslot
-  Future<void> _addTimeslotDialog(BuildContext context) async {
-    final TextEditingController labelController = TextEditingController();
-    
-    final result = await showDialog<String>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Add New Time Slot'),
-          content: TextField(
-            controller: labelController,
-            decoration: const InputDecoration(labelText: 'Time Slot Label (e.g., Morning Vitals, 7:00 AM)'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(null),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (labelController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Time Slot Label is required.')),
-                  );
-                  return;
-                }
-                Navigator.of(context).pop(labelController.text.trim());
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (result != null) {
-      addTimeslot(VitalTimeslot(
-        id: Random().nextInt(100000).toString(), // Mock ID
-        label: result,
-      ));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Time Slot "$result" added successfully.')),
-      );
-    }
-  }
-
-  // --- UI FOR CONFIGURATION PAGE ---\n
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
+    return ListView(
       padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. Vital Types Configuration Section
-          const Text(
-            'Configured Vital Types',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const Divider(height: 20),
-          ...vitals.map((vital) => VitalConfigCard(
-            title: vital.name,
-            schedule: vital.normalRange, // Using normalRange here, schedule logic to be implemented later
-            onEdit: () => _editVitalDialog(context, vital),
-            onDelete: () => deleteVital(vital.id),
-          )).toList(),
-          Center(
-            child: ElevatedButton.icon(
-              onPressed: () => _addVitalDialog(context),
-              icon: const Icon(Icons.add),
-              label: const Text('Add New Vital Type'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                backgroundColor: Theme.of(context).primaryColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                elevation: 0,
-              ),
-            ),
-          ),
+      children: [
+        // --- Vital Types Configuration ---
+        _buildSectionHeader(context, 'Vital Signs to Track', Icons.monitor_heart),
+        ...configuredVitals.map((vital) => _buildVitalTile(context, vital)).toList(),
+        _buildAddButton(
+          context: context,
+          label: 'Add New Vital Sign',
+          icon: Icons.add_box_outlined,
+          onPressed: () => _showAddEditVitalDialog(context),
+        ),
+        
+        const Divider(height: 32),
 
-          const SizedBox(height: 40),
-
-          // 2. Timeslots Configuration Section
-          const Text(
-            'Configured Time Slots',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const Divider(height: 20),
-          ...timeslots.map((slot) => TimeslotConfigCard(
-            label: slot.label,
-            onDelete: () => deleteTimeslot(slot.id),
-          )).toList(),
-          Center(
-            child: ElevatedButton.icon(
-              onPressed: () => _addTimeslotDialog(context),
-              icon: const Icon(Icons.add),
-              label: const Text('Add New Time Slot'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                backgroundColor: Theme.of(context).primaryColor.withOpacity(0.8),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                elevation: 0,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 40),
-        ],
-      ),
+        // --- Timeslots Configuration ---
+        _buildSectionHeader(context, 'Scheduled Timeslots', Icons.access_time),
+        ...timeslots.map((slot) => _buildTimeslotTile(context, slot)).toList(),
+        _buildAddButton(
+          context: context,
+          label: 'Add New Timeslot',
+          icon: Icons.schedule,
+          onPressed: () => _showAddEditTimeslotDialog(context),
+        ),
+      ],
     );
   }
-}
 
-// --- CONFIG CARD WIDGETS ---
-
-class VitalConfigCard extends StatelessWidget {
-  final String title;
-  final String schedule;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  const VitalConfigCard({
-    super.key,
-    required this.title,
-    required this.schedule,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.15),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  // Widget Builders
+  Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
+      child: Row(
         children: [
+          Icon(icon, color: Theme.of(context).primaryColor, size: 24),
+          const SizedBox(width: 8),
           Text(
             title,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Normal Range: $schedule',
-            style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-          ),
-          const Divider(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: onEdit,
-                child: const Text('Edit Details', style: TextStyle(color: Colors.blue)),
-              ),
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: onDelete,
-                child: const Text('Remove', style: TextStyle(color: Colors.red)),
-              ),
-            ],
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
         ],
       ),
     );
   }
-}
 
-class TimeslotConfigCard extends StatelessWidget {
-  final String label;
-  final VoidCallback onDelete;
-
-  const TimeslotConfigCard({
-    super.key,
-    required this.label,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.15),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 3),
-          ),
-        ],
+  Widget _buildAddButton({
+    required BuildContext context,
+    required String label,
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(
+          minimumSize: const Size.fromHeight(40),
+        ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
-          ),
-          TextButton(
-            onPressed: onDelete,
-            child: const Text('Remove', style: TextStyle(color: Colors.red)),
-          ),
-        ],
+    );
+  }
+
+  Widget _buildVitalTile(BuildContext context, VitalType vital) {
+    return Card(
+      child: ListTile(
+        title: Text(vital.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text('${vital.normalRange} (${vital.unit})'),
+        trailing: Row(
+          // FIX 3: Corrected the typo MainAxisSizeSize to MainAxisSize
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.edit, color: Colors.blueGrey),
+              onPressed: () => _showAddEditVitalDialog(context, vital),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () => _confirmDelete(context, vital.id, vital.name, onDeleteVital),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildTimeslotTile(BuildContext context, VitalTimeslot slot) {
+    return Card(
+      child: ListTile(
+        title: Text(slot.label, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(slot.time.format(context)),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.edit, color: Colors.blueGrey),
+              onPressed: () => _showAddEditTimeslotDialog(context, slot),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () => _confirmDelete(context, slot.id, slot.label, onDeleteTimeslot),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- Dialogs and Helpers ---
+
+  // Helper for Vital Type Dialog
+  void _showAddEditVitalDialog(BuildContext context, [VitalType? existingVital]) {
+    final isEditing = existingVital != null;
+    final nameController = TextEditingController(text: existingVital?.name ?? '');
+    final rangeController = TextEditingController(text: existingVital?.normalRange ?? '');
+    final unitController = TextEditingController(text: existingVital?.unit ?? '');
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(isEditing ? 'Edit Vital Sign' : 'Add New Vital Sign'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Vital Name (e.g., Blood Pressure)')),
+                TextField(controller: rangeController, decoration: const InputDecoration(labelText: 'Normal Range (e.g., 120/80)')),
+                TextField(controller: unitController, decoration: const InputDecoration(labelText: 'Unit (e.g., mmHg, BPM, °F)')),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () {
+                if (nameController.text.isNotEmpty && rangeController.text.isNotEmpty && unitController.text.isNotEmpty) {
+                  final newVital = VitalType(
+                    id: isEditing ? existingVital!.id : const Uuid().v4(),
+                    name: nameController.text,
+                    normalRange: rangeController.text,
+                    unit: unitController.text,
+                  );
+                  isEditing ? onUpdateVital(newVital.id, newVital) : onAddVital(newVital);
+                  Navigator.pop(context);
+                }
+              },
+              child: Text(isEditing ? 'Save' : 'Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Helper for Timeslot Dialog
+  void _showAddEditTimeslotDialog(BuildContext context, [VitalTimeslot? existingSlot]) {
+    final isEditing = existingSlot != null;
+    final labelController = TextEditingController(text: existingSlot?.label ?? '');
+    TimeOfDay selectedTime = existingSlot?.time ?? TimeOfDay.now();
+
+    // The time picker must be managed in a stateful way to update the dialog's UI.
+    // Since VitalsConfigPage is StatelessWidget, we must use a StatefulWidget for the dialog content.
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            Future<void> selectTime() async {
+              final TimeOfDay? picked = await showTimePicker(
+                context: context,
+                initialTime: selectedTime,
+              );
+              if (picked != null && picked != selectedTime) {
+                setState(() {
+                  selectedTime = picked;
+                });
+              }
+            }
+
+            return AlertDialog(
+              title: Text(isEditing ? 'Edit Timeslot' : 'Add New Timeslot'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(controller: labelController, decoration: const InputDecoration(labelText: 'Timeslot Label (e.g., Dinner, Before Bed)')),
+                    ListTile(
+                      title: Text('Time: ${selectedTime.format(context)}'),
+                      trailing: const Icon(Icons.edit),
+                      onTap: selectTime,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                ElevatedButton(
+                  onPressed: () {
+                    if (labelController.text.isNotEmpty) {
+                      final newSlot = VitalTimeslot(
+                        id: isEditing ? existingSlot!.id : const Uuid().v4(),
+                        label: labelController.text,
+                        time: selectedTime,
+                      );
+                      isEditing ? onUpdateTimeslot(newSlot.id, newSlot) : onAddTimeslot(newSlot);
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: Text(isEditing ? 'Save' : 'Add'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Helper for Delete Confirmation
+  void _confirmDelete(BuildContext context, String id, String name, Function(String) onDelete) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Confirm Deletion'),
+          content: Text('Are you sure you want to delete "$name"?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+              onPressed: () {
+                onDelete(id);
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }
