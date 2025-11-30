@@ -12,6 +12,7 @@ import 'package:uuid/uuid.dart';
 import 'pages/vitals_config_page.dart'; // Vitals Configuration Tab
 import 'models/vitals_data_models.dart'; // VitalType, VitalReading
 import 'models/vital_timeslot.dart';
+import 'models/vital_reading.dart';
 import '../widgets/profile_menu.dart';
 
 
@@ -50,11 +51,11 @@ class CaregiverSupportApp extends StatelessWidget {
             color: Color(0xFF1E2D3D),
           ),
         ),
-        cardTheme: CardThemeData(
+        cardTheme: CardTheme(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          color:Colors.white,
+          color: Colors.white,
           elevation: 2,
           margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         ),
@@ -452,7 +453,9 @@ class _VitalsScreenState extends State<VitalsScreen> {
               Tab(text: 'Configuration', icon: Icon(Icons.settings)),
             ],
           ),
-          actions: [const ProfileMenuButton()],
+          actions: const [
+            ProfileMenuButton(),
+          ],
         ),
         body: TabBarView(
           children: [
