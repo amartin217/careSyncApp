@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../models/appointment.dart';
 import '../models/caregiver.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../widgets/profile_menu.dart';
 
 final supabase = Supabase.instance.client;
 
@@ -26,7 +25,7 @@ class _CalendarPageState extends State<CalendarPage> {
         appointments.add(event);
       });
     }
-
+  
   @override
   void initState() {
     super.initState();
@@ -97,19 +96,68 @@ Future<List<Caregiver>> fetchCaregivers(bool isPatient) async {
     name: row['profile']?['name'] ?? '',
     color: hexToColor(row['profile']?['color'] ?? Colors.grey), // ✅ access color from profile table,
   )).toList();
-  print("about to return");
   return formatted_caregivers;
 }
 
 Future<void> _loadCaregivers() async {
-  print("in load caregivers isPatient: $isPatient");
+  final currentUser = Supabase.instance.client.auth.currentUser!;
+  final profile = await Supabase.instance.client
+      .from('Profile')
+      .select('is_patient')
+      .eq('user_id', currentUser.id)
+      .maybeSingle();
+
+  final isPatient = profile?['is_patient'] ?? false;
+
   List<Caregiver> fetchedCaregivers = await fetchCaregivers(isPatient);
   final names = caregivers.map((c) => c.name).join(', ');
   print("Caregiver names: $names");
 
   setState(() {
-    caregivers = fetchedCaregivers; 
+    caregivers = fetchedCaregivers;
   });
+}
+
+Future<List<CaregiverAppointment>> fetchAppointments(DateTime date) async {
+  final supabase = Supabase.instance.client;
+  final currentUser = supabase.auth.currentUser;
+  if (currentUser == null) {
+    throw Exception('User not logged in — cannot fetch appointments.');
+  }
+  final startOfDay = DateTime(date.year, date.month, date.day);
+  final endOfDay = startOfDay.add(const Duration(days: 1));
+
+  try {
+    final response = await supabase
+        .from('Event')
+        .select()
+        .gte('start_datetime', startOfDay.toIso8601String())
+        .lt('start_datetime', endOfDay.toIso8601String());
+
+    if (response == null || response.isEmpty) {
+      print('No appointments found for ${date.toIso8601String()}');
+      return [];
+    }
+    print('✅ Fetched ${response.length} appointments');
+
+    return (response as List<dynamic>)
+        .map<CaregiverAppointment>((e) => CaregiverAppointment.fromJson(e))
+        .toList();
+  } catch (error) {
+    print('❌ Failed to fetch appointments: $error');
+    rethrow;
+  }
+}
+
+Future<void> _loadAppointments() async {
+  try {
+    final fetched = await fetchAppointments(selectedDate);
+    setState(() {
+      appointments = fetched;
+    });
+  } catch (e) {
+    print('❌ Failed to load appointments: $e');
+  }
 }
 
 Future<List<CaregiverAppointment>> fetchAppointmentsForWeek(DateTime startOfWeek) async {
@@ -118,35 +166,14 @@ Future<List<CaregiverAppointment>> fetchAppointmentsForWeek(DateTime startOfWeek
   if (currentUser == null) {
     throw Exception('User not logged in — cannot fetch appointments.');
   }
-
   final start = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+  // End of week = 7 days later, also at midnight (exclusive)
   final end = start.add(const Duration(days: 7));
 
   try {
-    // Determine the patient_id to filter by
-    String? patientId;
-    if (isPatient) {
-      // If the current user is a patient, use their own ID
-      patientId = currentUser.id;
-    } else {
-      // If caregiver, fetch the patient_id(s) linked to them
-      final relation = await supabase
-          .from('CareRelation')
-          .select('patient_id')
-          .eq('user_id', currentUser.id)
-          .maybeSingle();
-
-      patientId = relation?['patient_id'];
-      if (patientId == null) {
-        return []; // No linked patient, return empty list
-      }
-    }
-
-    // Fetch only appointments for the relevant patient
     final response = await supabase
         .from('Event')
         .select()
-        .eq('patient_id', patientId)
         .gte('start_datetime', start.toIso8601String())
         .lt('start_datetime', end.toIso8601String());
 
@@ -162,7 +189,6 @@ Future<List<CaregiverAppointment>> fetchAppointmentsForWeek(DateTime startOfWeek
     return [];
   }
 }
-
 
 Map<DateTime, List<CaregiverAppointment>> groupedAppointments = {};
 
@@ -202,28 +228,9 @@ Future<List<CaregiverAppointment>> fetchAppointmentsForMonth(DateTime referenceD
   final endOfMonth = DateTime(referenceDate.year, referenceDate.month + 1, 1);
 
   try {
-    // Determine the patient_id to filter by
-    String? patientId;
-    if (isPatient) {
-      patientId = currentUser.id;
-    } else {
-      final relation = await supabase
-          .from('CareRelation')
-          .select('patient_id')
-          .eq('user_id', currentUser.id)
-          .maybeSingle();
-
-      patientId = relation?['patient_id'];
-      if (patientId == null) {
-        return []; // No linked patient
-      }
-    }
-
-    // Fetch only appointments for the relevant patient
     final response = await supabase
         .from('Event')
         .select()
-        .eq('patient_id', patientId)
         .gte('start_datetime', startOfMonth.toIso8601String())
         .lt('start_datetime', endOfMonth.toIso8601String());
 
@@ -239,7 +246,6 @@ Future<List<CaregiverAppointment>> fetchAppointmentsForMonth(DateTime referenceD
     return [];
   }
 }
-
 
 Future<void> _loadAppointmentsForMonth(DateTime referenceDate) async {
   final monthAppointments = await fetchAppointmentsForMonth(referenceDate);
@@ -402,60 +408,55 @@ Future<void> deleteAppointmentBackend(String id) async {
  * Widgets
  * ######################################
  */
+  @override
 
 @override
-Widget build(BuildContext context) {
-  return Scaffold(
-    resizeToAvoidBottomInset: false, // prevents automatic resizing when keyboard appears
-    appBar: AppBar(
-      title: Text("Care Schedule"),
-      centerTitle: true,
-      backgroundColor: Theme.of(context).primaryColor,
-      foregroundColor: Colors.white,
-      actions: const [
-        ProfileMenuButton(),
-      ],
-    ),
-    body: SingleChildScrollView(
-      child: Column(
-        children: [
-          // --- Header with week/month toggle ---
-          _buildCalendarHeader(),
-
-          // --- Calendar Grid ---
-          if (isMonthView)
-            SizedBox(
-              height: 450,
-              child: _buildMonthlyCalendarGrid(),
-            )
-          else
-            SizedBox(
-              height: 110,
-              child: _buildWeeklyCalendarGrid(),
-            ),
-
-          // --- Caregiver Legend ---
-          _buildCaregiverLegend(),
-
-          // --- Appointments list ---
-          SizedBox(
-            height: 400,
-            child: _buildAppointmentsList(),
-          ),
-        ],
+  Widget build(BuildContext context) {
+    return Scaffold(
+      resizeToAvoidBottomInset: false, // prevents automatic resizing when keyboard appears
+      appBar: AppBar(
+        title: Text("Care Schedule"),
+        centerTitle: true,
+        backgroundColor: Theme.of(context).primaryColor,
+        foregroundColor: Colors.white,
       ),
-    ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // --- Header with week/month toggle ---
+            _buildCalendarHeader(),
 
-    // ✅ Only show Add button if NOT patient
-    floatingActionButton: isPatient
-        ? null
-        : FloatingActionButton(
-            onPressed: _showAddAppointmentDialog,
-            child: Icon(Icons.add),
-          ),
-    floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-  );
-}
+            // --- Calendar Grid ---
+            if (isMonthView)
+              SizedBox(
+                height: 450, // fixed height for month grid
+                child: _buildMonthlyCalendarGrid(),
+              )
+            else
+              SizedBox(
+                height: 110, // fixed height for week grid
+                child: _buildWeeklyCalendarGrid(),
+              ),
+
+            // --- Caregiver Legend ---
+            _buildCaregiverLegend(),
+
+            // --- Appointments list ---
+            // Wrap in SizedBox to give it a fixed height so scroll works
+            SizedBox(
+              height: 400, // adjust this depending on screen
+              child: _buildAppointmentsList(),
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddAppointmentDialog,
+        child: Icon(Icons.add),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+    );
+  }
 
 Widget _buildCalendarHeader() {
   return Container(
@@ -481,6 +482,7 @@ Widget _buildCalendarHeader() {
                     selectedDate = selectedDate.subtract(const Duration(days: 7));
                     _loadAppointmentsForWeek(selectedDate);
                   }
+                  _loadAppointments();
                 });
               },
               icon: const Icon(Icons.chevron_left),
@@ -503,6 +505,7 @@ Widget _buildCalendarHeader() {
                     selectedDate = selectedDate.add(const Duration(days: 7));
                     _loadAppointmentsForWeek(selectedDate);
                   }
+                  _loadAppointments();
                 });
               },
               icon: const Icon(Icons.chevron_right),
@@ -597,6 +600,7 @@ Widget _buildCalendarHeader() {
                     onTap: () {
                       setState(() {
                         selectedDate = currentDate;
+                        _loadAppointments();
                         _loadAppointmentsForWeek(selectedDate);
                       });
                     },
@@ -668,11 +672,8 @@ Widget _buildCalendarHeader() {
   Widget _buildMonthlyCalendarGrid() {
     // Get the first day of the current month
     final firstDayOfMonth = DateTime(selectedDate.year, selectedDate.month, 1);
-
-  final startOfCalendar = firstDayOfMonth.subtract(
-  Duration(days: firstDayOfMonth.weekday % 7),
-);
-
+    // Find the start of the first week (Sunday) that includes the first day
+    final startOfCalendar = firstDayOfMonth.subtract(Duration(days: firstDayOfMonth.weekday % 7));
     // Calculate total number of days to display (6 weeks = 42 days)
     const totalDays = 42;
 
@@ -714,6 +715,7 @@ Widget _buildCalendarHeader() {
                       onTap: () {
                         setState(() {
                           selectedDate = currentDate;
+                          _loadAppointments();
                           _loadAppointmentsForMonth(selectedDate);
                         });
                       },
@@ -788,7 +790,7 @@ Widget _buildCalendarHeader() {
     return Container(
       padding: EdgeInsets.all(16),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             "Care Team",
@@ -873,12 +875,12 @@ Widget _buildCalendarHeader() {
     );
   }
 
-Widget _buildAppointmentCard(CaregiverAppointment appointment, Caregiver? caregiver) {
+  Widget _buildAppointmentCard(CaregiverAppointment appointment, Caregiver? caregiver) {
   final bool isCompleted = appointment.status == AppointmentStatus.completed;
 
   return Card(
     margin: EdgeInsets.only(bottom: 12),
-    color: isCompleted ? Colors.grey.shade300 : Colors.white,
+    color: isCompleted ? Colors.grey.shade300 : Colors.white, // ✅ Background change
     child: Padding(
       padding: EdgeInsets.all(16),
       child: Column(
@@ -889,6 +891,13 @@ Widget _buildAppointmentCard(CaregiverAppointment appointment, Caregiver? caregi
               CircleAvatar(
                 radius: 20,
                 backgroundColor: caregiver?.color ?? Colors.blue,
+                // child: Text(
+                  // caregiver?.avatar ?? '?',
+                  // style: TextStyle(
+                  //   color: Colors.white,
+                  //   fontWeight: FontWeight.bold,
+                  // ),
+                // ),
               ),
               SizedBox(width: 12),
               Expanded(
@@ -903,7 +912,9 @@ Widget _buildAppointmentCard(CaregiverAppointment appointment, Caregiver? caregi
                         decoration: isCompleted
                             ? TextDecoration.lineThrough
                             : TextDecoration.none,
-                        color: isCompleted ? Colors.grey.shade700 : Colors.black,
+                        color: isCompleted
+                            ? Colors.grey.shade700 // ✅ Dimmed when completed (optional)
+                            : Colors.black,
                       ),
                     ),
                     Text(
@@ -923,7 +934,9 @@ Widget _buildAppointmentCard(CaregiverAppointment appointment, Caregiver? caregi
                     _formatTime(appointment.dateTime),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: isCompleted ? Colors.grey.shade700 : Colors.black,
+                      color: isCompleted
+                          ? Colors.grey.shade700 // ✅ Optional dimming
+                          : Colors.black,
                     ),
                   ),
                 ],
@@ -936,42 +949,44 @@ Widget _buildAppointmentCard(CaregiverAppointment appointment, Caregiver? caregi
             Text(
               appointment.description,
               style: TextStyle(
-                color: isCompleted ? Colors.grey.shade700 : Colors.grey[600],
+                color: isCompleted
+                    ? Colors.grey.shade700 // ✅ Optional dimming
+                    : Colors.grey[600],
               ),
             ),
           ],
           SizedBox(height: 12),
-          // Only show Complete/Edit/Delete if NOT a patient
-          if (!isPatient)
-            Row(
-              children: [
-                Spacer(),
-                Row(
-                  children: [
-                    SizedBox(width: 8),
-                    ElevatedButton.icon(
-                      onPressed: () => _toggleCompletion(appointment),
-                      icon: Icon(
-                        isCompleted
-                            ? Icons.check_box
-                            : Icons.check_box_outline_blank,
-                      ),
-                      label: Text(isCompleted ? 'Uncomplete' : 'Complete'),
+          Row(
+            children: [
+              Spacer(),
+              Row(
+                children: [
+                  SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () => _toggleCompletion(appointment),
+                    icon: Icon(
+                      isCompleted
+                          ? Icons.check_box
+                          : Icons.check_box_outline_blank,
                     ),
-                    SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () => _showEditAppointmentDialog(appointment),
-                      child: Text('Edit'),
+                    label: Text(
+                      isCompleted ? 'Uncomplete' : 'Complete',
                     ),
-                    SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () => _showDeleteAppointmentDialog(appointment),
-                      child: Text('Delete'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                  SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () => _showEditAppointmentDialog(appointment),
+                    child: Text('Edit'),
+                  ),
+                  SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () => _showDeleteAppointmentDialog(appointment),
+                    child: Text('Delete'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ],
       ),
     ),
@@ -1069,161 +1084,143 @@ Widget _buildAppointmentCard(CaregiverAppointment appointment, Caregiver? caregi
       }
       TimeOfDay? selectedTime;                      // must pick time
       Duration selectedDuration = const Duration(hours: 1);
+
       showDialog(
-  context: context,
-  builder: (context) {
-    return StatefulBuilder(
-      builder: (context, setModalState) {
-        return AlertDialog(
-          title: const Text('Add Appointment'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ✅ Title with red asterisk
-                Row(
-                  children: const [
-                    Text('Title', style: TextStyle(fontWeight: FontWeight.bold)),
-                    Text('*', style: TextStyle(color: Colors.red)),
-                  ],
-                ),
-                TextField(
-                  controller: _titleController,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter appointment title',
+        context: context,
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (context, setModalState) {
+              return AlertDialog(
+                title: const Text('Add Appointment'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: _titleController,
+                        decoration: const InputDecoration(labelText: 'Title'),
+                      ),
+                      TextField(
+                        controller: _descriptionController,
+                        decoration: const InputDecoration(labelText: 'Description'),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<Caregiver>(
+                        value: selectedCaregiver,
+                        items: caregivers
+                            .map((c) => DropdownMenuItem(
+                                  value: c,
+                                  child: Text(c.name),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          setModalState(() {
+                            selectedCaregiver = value!;
+                          });
+                        },
+                        decoration: const InputDecoration(labelText: 'Assign to'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: () async {
+                          final pickedDate = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2100),
+                          );
+                          if (pickedDate != null) {
+                            setModalState(() {
+                              selectedDate = pickedDate;
+                            });
+                          }
+                        },
+                        child: Text(
+                          'Pick Date: ${selectedDate.toLocal().toString().split(' ')[0]}',
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          final pickedTime = await showTimePicker(
+                            context: context,
+                            initialTime: selectedTime ?? TimeOfDay.now(),
+                          );
+                          if (pickedTime != null) {
+                            setModalState(() {
+                              selectedTime = pickedTime;
+                            });
+                          }
+                        },
+                        child: Text(
+                          selectedTime == null
+                              ? 'Pick Time'
+                              : 'Time: ${selectedTime!.format(context)}',
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _descriptionController,
-                  decoration: const InputDecoration(labelText: 'Description'),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<Caregiver>(
-                  value: selectedCaregiver,
-                  items: caregivers
-                      .map((c) => DropdownMenuItem(
-                            value: c,
-                            child: Text(c.name),
-                          ))
-                      .toList(),
-                  onChanged: (value) {
-                    setModalState(() {
-                      selectedCaregiver = value!;
-                    });
-                  },
-                  decoration: const InputDecoration(labelText: 'Assign to'),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () async {
-                    final pickedDate = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2100),
-                    );
-                    if (pickedDate != null) {
-                      setModalState(() {
-                        selectedDate = pickedDate;
-                      });
-                    }
-                  },
-                  child: Text(
-                    'Pick Date: ${selectedDate.toLocal().toString().split(' ')[0]}',
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
                   ),
-                ),
-                // ✅ Pick Time with red asterisk
-                Row(
-                  children: const [
-                    Text('Pick Time', style: TextStyle(fontWeight: FontWeight.bold)),
-                    Text('*', style: TextStyle(color: Colors.red)),
-                  ],
-                ),
-                TextButton(
-                  onPressed: () async {
-                    final pickedTime = await showTimePicker(
-                      context: context,
-                      initialTime: selectedTime ?? TimeOfDay.now(),
-                    );
-                    if (pickedTime != null) {
-                      setModalState(() {
-                        selectedTime = pickedTime;
-                      });
-                    }
-                  },
-                  child: Text(
-                    selectedTime == null
-                        ? 'Select Time'
-                        : 'Time: ${selectedTime!.format(context)}',
+                  ElevatedButton(
+                    onPressed: () async {
+                      if (_titleController.text.trim().isEmpty) return;
+
+                      if (selectedTime == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Please select a time')),
+                        );
+                        return;
+                      }
+
+                      final finalDateTime = DateTime(
+                        selectedDate.year,
+                        selectedDate.month,
+                        selectedDate.day,
+                        selectedTime!.hour,
+                        selectedTime!.minute,
+                      );
+
+                      final newEvent = CaregiverAppointment(
+                        id: DateTime.now().millisecondsSinceEpoch.toString(),
+                        title: _titleController.text.trim(),
+                        description: _descriptionController.text.trim(),
+                        caregiverId: selectedCaregiver!.id,
+                        dateTime: finalDateTime,
+                        duration: selectedDuration,
+                        status: AppointmentStatus.scheduled,
+                      );
+
+                      // 1️⃣ Update local state immediately
+                      _addEvent(newEvent);
+
+                      // 2️⃣ Call backend and handle errors
+                      try {
+                        await addAppointmentToBackend(newEvent);
+                        await _loadAppointmentsForWeek(selectedDate); 
+                        await _loadAppointments(); // refresh appointments list or calendar
+                        Navigator.of(context).pop(); // only close if successful
+                      } catch (e) {
+                        // Roll back local state if needed
+                        setState(() {
+                          appointments.removeWhere((a) => a.id == newEvent.id);
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to add appointment: $e')),
+                        );
+                      }
+                    },
+                    child: const Text('Add'),
                   ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (_titleController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter a title')),
-                  );
-                  return;
-                }
-
-                if (selectedTime == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please select a time')),
-                  );
-                  return;
-                }
-
-                final finalDateTime = DateTime(
-                  selectedDate.year,
-                  selectedDate.month,
-                  selectedDate.day,
-                  selectedTime!.hour,
-                  selectedTime!.minute,
-                );
-
-                final newEvent = CaregiverAppointment(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  title: _titleController.text.trim(),
-                  description: _descriptionController.text.trim(),
-                  caregiverId: selectedCaregiver!.id,
-                  dateTime: finalDateTime,
-                  duration: selectedDuration,
-                  status: AppointmentStatus.scheduled,
-                );
-
-                _addEvent(newEvent);
-
-                try {
-                  await addAppointmentToBackend(newEvent);
-                  await _loadAppointmentsForWeek(selectedDate);
-                  Navigator.of(context).pop();
-                } catch (e) {
-                  setState(() {
-                    appointments.removeWhere((a) => a.id == newEvent.id);
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to add appointment: $e')),
-                  );
-                }
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        );
-      },
-    );
-  },
-);
+                ],
+              );
+            },
+          );
+        },
+      );
     }
 
   void _showEditAppointmentDialog(CaregiverAppointment appointment) {
