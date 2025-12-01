@@ -1,38 +1,45 @@
-import 'package:flutter/material.dart';
-
 class Vital {
   final String id;
   String name;
-  String normalRange;
-  final String unit; // <--- NEW: Added unit for display
-  final IconData icon; // Added for the LatestVitalCard
-  final Color iconColor; // Added for the LatestVitalCard
+  String units;
+  String notes;
+  List<String> timeslotIds;
 
   Vital({
     required this.id,
     required this.name,
-    required this.normalRange,
-    required this.unit, // <--- NEW: Must be provided
-    required this.icon,
-    required this.iconColor,
+    required this.units,
+    this.notes = '',
+    required this.timeslotIds,
   });
-  
-  // Helper for creating new state (essential for setState updates)
+
   Vital copyWith({
     String? id,
     String? name,
-    String? normalRange,
-    String? unit, // <--- NEW: Added unit
-    IconData? icon,
-    Color? iconColor,
+    String? units,
+    String? notes,
+    List<String>? timeslotIds,
   }) {
     return Vital(
       id: id ?? this.id,
       name: name ?? this.name,
-      normalRange: normalRange ?? this.normalRange,
-      unit: unit ?? this.unit, // <--- NEW: Copy unit
-      icon: icon ?? this.icon,
-      iconColor: iconColor ?? this.iconColor,
+      units: units ?? this.units,
+      notes: notes ?? this.notes,
+      timeslotIds: timeslotIds ?? this.timeslotIds,
+    );
+  }
+
+  factory Vital.fromJson(Map<String, dynamic> json) {
+    return Vital(
+      id: json['vital_id'],
+      name: json['name'],
+      units: json['units'] ?? '',
+      notes: json['notes'] ?? '',
+      timeslotIds:
+          (json['timeslot_ids'] as List<dynamic>? ?? []).cast<String>(),
     );
   }
 }
+
+
+

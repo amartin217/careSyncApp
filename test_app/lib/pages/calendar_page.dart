@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 final supabase = Supabase.instance.client;
 
 class CalendarPage extends StatefulWidget {
+
   const CalendarPage({super.key});
 
   @override
@@ -59,6 +60,20 @@ Color hexToColor(String code) {
  * ########################################
  */
 
+  Color parseColor(String? hexColor) {
+    if (hexColor == null || hexColor.isEmpty) return Colors.blue.shade100; // fallback
+
+    // Remove # if present
+    final hex = hexColor.replaceAll('#', '');
+
+    // Add alpha FF if missing
+    final buffer = StringBuffer();
+    if (hex.length == 6) buffer.write('FF'); // full opacity
+    buffer.write(hex);
+
+    return Color(int.parse(buffer.toString(), radix: 16));
+  }
+
 Future<List<Caregiver>> fetchCaregivers(bool isPatient) async {
   final supabase = Supabase.instance.client;
   final currentUser = supabase.auth.currentUser!;
@@ -94,7 +109,7 @@ Future<List<Caregiver>> fetchCaregivers(bool isPatient) async {
   final formatted_caregivers = response.map((row) => Caregiver(
     id: row['user_id'],
     name: row['profile']?['name'] ?? '',
-    color: hexToColor(row['profile']?['color'] ?? Colors.grey), // ✅ access color from profile table,
+    color: parseColor(row['profile']?['color']),
   )).toList();
   return formatted_caregivers;
 }
@@ -1331,9 +1346,14 @@ Widget _buildCalendarHeader() {
 
                   // 1️⃣ Update local state optimistically
                   final index = appointments.indexWhere((a) => a.id == appointment.id);
-                  setState(() {
-                    appointments[index] = updatedAppointment;
-                  });
+                  if(index!= -1){
+                    setState(() {
+                      appointments[index] = updatedAppointment;
+                    });
+                  }
+                  else{
+                    print("Error: could not find appointment to update locally.");
+                  }
 
                   // 2️⃣ Update backend
                   try {
