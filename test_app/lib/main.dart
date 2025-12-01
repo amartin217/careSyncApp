@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'pages/dashboard_page.dart';
 import 'pages/medication_page.dart';
 import 'pages/vitals_page.dart';
-import 'pages/calendar_page.dart';
+import 'pages/calendar_page_old.dart';
 import 'pages/messaging_page.dart';
 import 'pages/link_patient_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -13,6 +13,7 @@ import 'models/vital.dart';
 import 'models/vital_timeslot.dart';
 import 'models/vital_reading.dart';
 import '../widgets/profile_menu.dart';
+// import 'navigation/auth_gate.dart';
 
 
 Future<void> main() async {
