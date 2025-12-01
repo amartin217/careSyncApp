@@ -79,7 +79,7 @@ class _VitalsPageState extends State<VitalsPage> {
 
       // Fetch timeslots
       final timeData = await supabase
-          .from('Timeslot')
+          .from('VitalTimeslot')
           .select()
           .eq('patient_id', patientId) as List<dynamic>;
 
@@ -100,9 +100,11 @@ class _VitalsPageState extends State<VitalsPage> {
           .from('Vital')
           .select()
           .eq('patient_id', patientId) as List<dynamic>;
+      
+      debugPrint('here1');
 
       final loadedVitals = vitalData.map<Vital>((v) => Vital.fromJson(v)).toList();
-
+      debugPrint('here2');
       // Fetch today's logs for these vitals
       Map<String, Map<String, VitalLog>> latest = {};
       if (loadedVitals.isNotEmpty) {
@@ -128,6 +130,7 @@ class _VitalsPageState extends State<VitalsPage> {
           }
         }
       }
+       debugPrint('here');
 
       setState(() {
         timeslots = loadedTimeslots;
@@ -240,7 +243,7 @@ class _VitalsPageState extends State<VitalsPage> {
     try {
       final patientId = await _resolvePatientId();
 
-      await supabase.from('Timeslot').insert({
+      await supabase.from('VitalTimeslot').insert({
         'id': slot.id,
         'label': slot.label,
         'time':
@@ -276,7 +279,7 @@ class _VitalsPageState extends State<VitalsPage> {
   Future<void> _deleteTimeslot(String timeslotId) async {
     try {
       await supabase.from('VitalLog').delete().eq('timeslot_id', timeslotId);
-      await supabase.from('Timeslot').delete().eq('id', timeslotId);
+      await supabase.from('VitalTimeslot').delete().eq('id', timeslotId);
 
       setState(() {
         timeslots.removeWhere((ts) => ts.id == timeslotId);
@@ -286,7 +289,7 @@ class _VitalsPageState extends State<VitalsPage> {
           final newIds = List<String>.from(v.timeslotIds)..remove(timeslotId);
           return v.copyWith(timeslotIds: newIds);
         }).toList();
-
+    //
         // Remove any latest logs for that timeslot
         latestLogs = latestLogs.map((vitalId, mapBySlot) {
           final newMap = Map<String, VitalLog>.from(mapBySlot)
@@ -309,11 +312,61 @@ class _VitalsPageState extends State<VitalsPage> {
     List<Vital> selectedVitals,
   ) async {
     try {
-      await supabase.from('Timeslot').update({
+      // --- 1. Update VitalTimeslot ---
+      await supabase.from('VitalTimeslot').update({
         'label': label,
         'time': '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
       }).eq('id', id);
-
+  
+      debugPrint('Timeslot updated');
+  
+      // --- 2. Prepare updates for Vital table ---
+      final List<Future> updateFutures = [];
+      final List<Vital> updatedVitals = [];
+  
+      for (final v in vitals) {
+        final bool hasSlot = v.timeslotIds.contains(id);
+        final bool isSelected = selectedVitals.contains(v);
+  
+        if (isSelected && !hasSlot) {
+          // Add this timeslot ID
+          final newIds = [...v.timeslotIds, id];
+  
+          updateFutures.add(
+            supabase
+                .from('Vital')
+                .update({'timeslot_ids': newIds})
+                .eq('vital_id', v.id),
+          );
+  
+          updatedVitals.add(
+            v.copyWith(timeslotIds: newIds),
+          );
+        } 
+        else if (!isSelected && hasSlot) {
+          // Remove this timeslot ID
+          final newIds = v.timeslotIds.where((tid) => tid != id).toList();
+  
+          updateFutures.add(
+            supabase
+                .from('Vital')
+                .update({'timeslot_ids': newIds})
+                .eq('vital_id', v.id),
+          );
+  
+          updatedVitals.add(
+            v.copyWith(timeslotIds: newIds),
+          );
+        } 
+        else {
+          updatedVitals.add(v);
+        }
+      }
+  
+      // --- 3. WAIT for all Supabase updates ---
+      await Future.wait(updateFutures);
+  
+      // --- 4. Now update widget state ---
       setState(() {
         timeslots = timeslots.map((slot) {
           if (slot.id == id) {
@@ -321,29 +374,12 @@ class _VitalsPageState extends State<VitalsPage> {
           }
           return slot;
         }).toList();
-
-        vitals = vitals.map((v) {
-          final hasSlot = v.timeslotIds.contains(id);
-          final isSelected = selectedVitals.contains(v);
-
-          if (isSelected && !hasSlot) {
-            // Add slot
-            final newIds = [...v.timeslotIds, id];
-            supabase
-                .from('Vital')
-                .update({'timeslot_ids': newIds}).eq('vital_id', v.id);
-            return v.copyWith(timeslotIds: newIds);
-          } else if (!isSelected && hasSlot) {
-            // Remove slot
-            final newIds = v.timeslotIds.where((tid) => tid != id).toList();
-            supabase
-                .from('Vital')
-                .update({'timeslot_ids': newIds}).eq('vital_id', v.id);
-            return v.copyWith(timeslotIds: newIds);
-          }
-          return v;
-        }).toList();
+  
+        vitals = updatedVitals;
       });
+  
+      debugPrint('All updates applied successfully');
+  
     } catch (e, stack) {
       debugPrint('Supabase update failed: $e');
       debugPrint(stack.toString());
@@ -352,6 +388,7 @@ class _VitalsPageState extends State<VitalsPage> {
       );
     }
   }
+
 
   // -------------------------
   // VITAL LOGS (per timeslot per day)
@@ -416,12 +453,14 @@ class _VitalsPageState extends State<VitalsPage> {
                       .update({
                         'value': val,
                         'datetime': now.toIso8601String(),
+                        'timeslot_id': timeslotId,
                       })
                       .eq('vital_log_id', existing.id);
 
                   final updatedLog = existing.copyWith(
                     value: val,
                     datetime: now,
+                    timeslotId: timeslotId
                   );
 
                   setState(() {
@@ -1011,7 +1050,7 @@ class VitalTimeslotCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.edit, color: Colors.blue),
+                    icon: const Icon(Icons.add, color: Colors.blue),
                     onPressed: () => upsertVitalLog(v.id, slot.id, existing: log),
                   ),
                   IconButton(
