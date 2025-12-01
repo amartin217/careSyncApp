@@ -9,10 +9,7 @@ import 'pages/link_patient_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
-import 'pages/vitals_config_page.dart'; // Vitals Configuration Tab
-import 'models/vitals_data_models.dart'; // VitalType, VitalReading
-import 'models/vital_timeslot.dart';
-import 'models/vital_reading.dart';
+import 'models/vital.dart'; // VitalType, VitalReading
 import '../widgets/profile_menu.dart';
 
 
@@ -51,7 +48,7 @@ class CaregiverSupportApp extends StatelessWidget {
             color: Color(0xFF1E2D3D),
           ),
         ),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -337,153 +334,6 @@ class _SignUpPageState extends State<SignUpPage> {
 }
 
 
-
-class VitalsScreen extends StatefulWidget {
-  const VitalsScreen({super.key});
-
-  @override
-  State<VitalsScreen> createState() => _VitalsScreenState();
-}
-
-class _VitalsScreenState extends State<VitalsScreen> {
-  final Uuid uuid = const Uuid();
-
-  // Initial Placeholder VitalTypes (with IDs)
-  // These IDs are used to link the readings to the type
-  final String bpVitalId = const Uuid().v4();
-  final String hrVitalId = const Uuid().v4();
-
-  late List<VitalType> _configuredVitals;
-  late List<VitalReading> _readings;
-  late List<VitalTimeslot> _timeslots;
-
-  @override
-  void initState() {
-    super.initState();
-    // Initialize Vitals and Readings
-    _configuredVitals = [
-      VitalType(id: bpVitalId, name: 'Blood Pressure', normalRange: '120/80', unit: 'mmHg'),
-      VitalType(id: hrVitalId, name: 'Heart Rate', normalRange: '60-100', unit: 'BPM'),
-      VitalType(id: const Uuid().v4(), name: 'Temperature', normalRange: '97.6-99.6', unit: '°F'),
-    ];
-
-    // Initialize Readings (FIX: Use vitalId instead of vitalName/type)
-    _readings = [
-      VitalReading(
-        id: uuid.v4(),
-        vitalId: bpVitalId, // FIX: Use vitalId
-        value: '125/82',
-        unit: 'mmHg',
-        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-      ),
-      VitalReading(
-        id: uuid.v4(),
-        vitalId: hrVitalId, // FIX: Use vitalId
-        value: '75',
-        unit: 'BPM',
-        timestamp: DateTime.now().subtract(const Duration(hours: 1)),
-      ),
-    ];
-
-    // Initialize Timeslots
-    _timeslots = [
-      VitalTimeslot(id: uuid.v4(), label: 'Morning', time: const TimeOfDay(hour: 8, minute: 0)),
-      VitalTimeslot(id: uuid.v4(), label: 'Evening', time: const TimeOfDay(hour: 18, minute: 0)),
-    ];
-  }
-
-  // --- VitalType Management Functions ---
-  void _addVital(VitalType vital) {
-    setState(() {
-      _configuredVitals = [..._configuredVitals, vital];
-    });
-  }
-
-  void _updateVital(String id, VitalType updatedVital) {
-    setState(() {
-      _configuredVitals = _configuredVitals.map((v) => v.id == id ? updatedVital : v).toList();
-    });
-  }
-
-  void _deleteVital(String id) {
-    setState(() {
-      _configuredVitals.removeWhere((v) => v.id == id);
-      // Also remove readings associated with the deleted vital
-      _readings.removeWhere((r) => r.vitalId == id);
-    });
-  }
-
-  // --- VitalReading Management Functions ---
-  void _addReading(VitalReading reading) {
-    setState(() {
-      _readings = [..._readings, reading];
-    });
-  }
-
-  // --- VitalTimeslot Management Functions ---
-  void _addTimeslot(VitalTimeslot slot) {
-    setState(() {
-      _timeslots = [..._timeslots, slot];
-    });
-  }
-
-  void _updateTimeslot(String id, VitalTimeslot updatedSlot) { // FIX: Added _updateTimeslot
-    setState(() {
-      _timeslots = _timeslots.map((s) => s.id == id ? updatedSlot : s).toList();
-    });
-  }
-
-  void _deleteTimeslot(String id) {
-    setState(() {
-      _timeslots.removeWhere((s) => s.id == id);
-    });
-  }
-
- 
-  @override
-  Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Vitals'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'My Vitals', icon: Icon(Icons.favorite_border)),
-              Tab(text: 'Configuration', icon: Icon(Icons.settings)),
-            ],
-          ),
-          actions: const [
-            ProfileMenuButton(),
-          ],
-        ),
-        body: TabBarView(
-          children: [
-            // My Vitals Page (Summary & Timeline)
-            VitalsPage(
-              configuredVitals: _configuredVitals,
-              readings: _readings,
-              addReading: _addReading, // FIX: Corrected parameter name from onAddReading
-            ),
-            // Configuration Page
-            VitalsConfigPage(
-              configuredVitals: _configuredVitals,
-              onAddVital: _addVital,
-              onDeleteVital: _deleteVital,
-              onUpdateVital: _updateVital,
-              timeslots: _timeslots,
-              onAddTimeslot: _addTimeslot,
-              onDeleteTimeslot: _deleteTimeslot,
-              onUpdateTimeslot: _updateTimeslot, // FIX: Added required parameter
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-}
-
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
 
@@ -497,7 +347,7 @@ class _MainPageState extends State<MainPage> {
   final List<Widget> _pages = [
     DashboardPage(),
     MedicationPage(),
-    const VitalsScreen(),
+    VitalsPage(),
     CalendarPage(),
     MessagingPage(),
   ];
