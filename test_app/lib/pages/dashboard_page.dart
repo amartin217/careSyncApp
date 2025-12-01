@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:test_app/models/vital.dart';
+import 'package:test_app/models/vital_log.dart';
 import '../widgets/profile_menu.dart';
 import 'package:intl/intl.dart';
 
@@ -34,6 +36,38 @@ class DashboardPage extends StatelessWidget {
   Color _getMedDarkColor(String medId) {
     final index = medColors.keys.toList().indexOf(medId) % colors.length;
     return colors[index].shade700;
+  }
+
+  final Map<String, Color> vitalColors = {};
+  final List<MaterialColor> vitalColorsList = [
+    Colors.blue,
+    Colors.red,
+    Colors.green,
+    Colors.yellow,
+    Colors.purple,
+    Colors.pink,
+    Colors.indigo,
+    Colors.lightBlue,
+    Colors.deepOrange,
+    Colors.cyan,
+    Colors.orange,
+    Colors.teal,
+    Colors.lime,
+    Colors.grey,
+    Colors.blueGrey,
+  ];
+
+  Color _getVitalColor(String vitalId) {
+    if (!vitalColors.containsKey(vitalId)) {
+      final index = vitalColors.length % vitalColorsList.length;
+      vitalColors[vitalId] = vitalColorsList[index].shade100;
+    }
+    return vitalColors[vitalId]!;
+  }
+
+  Color _getVitalDarkColor(String vitalId) {
+    final index = vitalColors.keys.toList().indexOf(vitalId) % vitalColorsList.length;
+    return vitalColorsList[index].shade700;
   }
 
   Future<Map<String, dynamic>?> _fetchUserProfile() async {
@@ -195,22 +229,76 @@ class DashboardPage extends StatelessWidget {
     return (events as List).map((e) => e as Map<String, dynamic>).toList();
   }
 
+  Future<List<Map<String, dynamic>>> _fetchRecordedVitals() async {
+    final supabase = Supabase.instance.client;
+    final userId = supabase.auth.currentUser!.id;
+
+    // get patient id
+    final relation = await supabase
+        .from('CareRelation')
+        .select('patient_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+    final patientId = relation != null ? relation['patient_id'] as String : userId;
+
+    // get vitals for patient
+    final vitalData = await supabase
+        .from('Vital')
+        .select()
+        .eq('patient_id', patientId) as List<dynamic>;
+    final loadedVitals = vitalData.map((v) => Vital.fromJson(v)).toList();
+    if (loadedVitals.isEmpty) return [];
+
+    final vitalIds = loadedVitals.map((v) => v.id).toList();
+
+    // get today's logs
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = start.add(const Duration(days: 1));
+    final logData = await supabase
+        .from('VitalLog')
+        .select()
+        .inFilter('vital_id', vitalIds)
+        .gte('datetime', start.toIso8601String())
+        .lt('datetime', end.toIso8601String()) as List<dynamic>;
+
+    // combine with Vital table
+    final combined = logData.map((log) {
+      final vital = loadedVitals.firstWhere((v) => v.id == log['vital_id']);
+      return {
+        'id': vital.id,
+        'name': vital.name,
+        'units': vital.units,
+        'value': log['value'],
+        'datetime': log['datetime'],
+      };
+   }).toList();
+    return combined;
+  }
+
+
   // -------------------
   // SECTION CARD HELPER
   // -------------------
 
-  Widget _sectionCard({
-    required String title,
-    required Widget child,
-    Color? color,
-  }) {
-    return Card(
+Widget _sectionCard({
+  required String title,
+  required Widget child,
+  Color? color,
+}) {
+  return SizedBox(
+    width: double.infinity, // 🔥 Forces full-width to match medication cards
+    child: Card(
       elevation: 3,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
+      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
       child: Container(
         padding: const EdgeInsets.all(16),
+        constraints: const BoxConstraints(
+          minHeight: 160, // Keep your original height
+        ),
         decoration: BoxDecoration(
           color: color ?? Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -218,16 +306,22 @@ class DashboardPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title,
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 12),
             child,
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -390,6 +484,37 @@ class DashboardPage extends StatelessWidget {
                                         .map((m) => _buildMedTile(context, m))
                                         .toList(),
                                   ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          FutureBuilder<List<Map<String, dynamic>>>(
+                            future: _fetchRecordedVitals(),
+                            builder: (context, eventSnapshot) {
+                              if (!eventSnapshot.hasData) {
+                                return const Center(
+                                    child: Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 20.0),
+                                  child: CircularProgressIndicator(),
+                                ));
+                              }
+                              final vitals = eventSnapshot.data!;
+                              return _sectionCard(
+                                title: "Today's Recorded Vitals",
+                                child: vitals.isEmpty
+                                    ? Text(
+                                        "No recorded vitals.",
+                                        style:
+                                            TextStyle(color: Colors.black54),
+                                      )
+                                    : Column(
+                                        children: vitals
+                                            .map((v) =>
+                                                _buildVitalTile(context, v))
+                                            .toList(),
+                                      ),
+                              );
+                            },
                           ),
 
                           const SizedBox(height: 24),
@@ -562,6 +687,54 @@ class DashboardPage extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+   Widget _buildVitalTile(BuildContext context, Map<String, dynamic> vital) {
+    final timeStr = DateFormat('h:mm a').format(DateTime.parse(vital['datetime']));
+    final vitalColor = _getVitalColor(vital['id']);
+    final vitalDarkColor = _getVitalDarkColor(vital['id']);
+  
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.all(0),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: vitalColor.withOpacity(0.5),
+          width: 1.5,
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: vitalColor.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "${vital['name']} (${vital['units']})",
+              style: Theme.of(context).textTheme.titleSmall!.copyWith(
+                  fontWeight: FontWeight.bold, color: Colors.black87),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(Icons.access_time, size: 16, color: vitalDarkColor),
+                const SizedBox(width: 4),
+                Text(timeStr, style: const TextStyle(fontSize: 13)),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              "Value: ${vital['value']}",
+              style: const TextStyle(fontSize: 12, color: Colors.black54),
+            ),
           ],
         ),
       ),

@@ -100,11 +100,9 @@ class _VitalsPageState extends State<VitalsPage> {
           .from('Vital')
           .select()
           .eq('patient_id', patientId) as List<dynamic>;
-      
-      debugPrint('here1');
 
       final loadedVitals = vitalData.map<Vital>((v) => Vital.fromJson(v)).toList();
-      debugPrint('here2');
+
       // Fetch today's logs for these vitals
       Map<String, Map<String, VitalLog>> latest = {};
       if (loadedVitals.isNotEmpty) {
@@ -130,7 +128,6 @@ class _VitalsPageState extends State<VitalsPage> {
           }
         }
       }
-       debugPrint('here');
 
       setState(() {
         timeslots = loadedTimeslots;
@@ -317,28 +314,28 @@ class _VitalsPageState extends State<VitalsPage> {
         'label': label,
         'time': '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
       }).eq('id', id);
-  
+
       debugPrint('Timeslot updated');
-  
+
       // --- 2. Prepare updates for Vital table ---
       final List<Future> updateFutures = [];
       final List<Vital> updatedVitals = [];
-  
+
       for (final v in vitals) {
         final bool hasSlot = v.timeslotIds.contains(id);
         final bool isSelected = selectedVitals.contains(v);
-  
+
         if (isSelected && !hasSlot) {
           // Add this timeslot ID
           final newIds = [...v.timeslotIds, id];
-  
+
           updateFutures.add(
             supabase
                 .from('Vital')
                 .update({'timeslot_ids': newIds})
                 .eq('vital_id', v.id),
           );
-  
+
           updatedVitals.add(
             v.copyWith(timeslotIds: newIds),
           );
@@ -346,14 +343,14 @@ class _VitalsPageState extends State<VitalsPage> {
         else if (!isSelected && hasSlot) {
           // Remove this timeslot ID
           final newIds = v.timeslotIds.where((tid) => tid != id).toList();
-  
+
           updateFutures.add(
             supabase
                 .from('Vital')
                 .update({'timeslot_ids': newIds})
                 .eq('vital_id', v.id),
           );
-  
+
           updatedVitals.add(
             v.copyWith(timeslotIds: newIds),
           );
@@ -362,10 +359,10 @@ class _VitalsPageState extends State<VitalsPage> {
           updatedVitals.add(v);
         }
       }
-  
+
       // --- 3. WAIT for all Supabase updates ---
       await Future.wait(updateFutures);
-  
+
       // --- 4. Now update widget state ---
       setState(() {
         timeslots = timeslots.map((slot) {
@@ -374,12 +371,12 @@ class _VitalsPageState extends State<VitalsPage> {
           }
           return slot;
         }).toList();
-  
+
         vitals = updatedVitals;
       });
-  
+
       debugPrint('All updates applied successfully');
-  
+
     } catch (e, stack) {
       debugPrint('Supabase update failed: $e');
       debugPrint(stack.toString());
@@ -1026,7 +1023,6 @@ class VitalTimeslotCard extends StatelessWidget {
                       minute: log.datetime.toLocal().minute)
                   .format(context)
               : "";
-
           return Container(
             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
@@ -1035,31 +1031,40 @@ class VitalTimeslotCard extends StatelessWidget {
               border: Border.all(color: color, width: 1.5),
             ),
             child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               title: Text(
-                v.units.isNotEmpty
-                    ? "${v.name} (${v.units})"
-                    : v.name,
+                v.units.isNotEmpty ? "${v.name} (${v.units})" : v.name,
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               subtitle: Text(
-                log != null
-                    ? "Value: $valueText at $timeText"
-                    : valueText,
+                log != null ? "Value: $valueText at $timeText" : valueText,
               ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.add, color: Colors.blue),
-                    onPressed: () => upsertVitalLog(v.id, slot.id, existing: log),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: log == null
-                        ? null
-                        : () => deleteVitalLog(v.id, slot.id),
-                  ),
-                ],
+              trailing: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton(
+                      onPressed: () => upsertVitalLog(v.id, slot.id, existing: log),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.blue,
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+                        textStyle: const TextStyle(fontSize: 18),
+                      ),
+                      child: const Text("Record Vital"),
+                    ),
+                    const SizedBox(height: 4),
+                    TextButton(
+                      onPressed: log == null ? null : () => deleteVitalLog(v.id, slot.id),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+                        textStyle: const TextStyle(fontSize: 18),
+                      ),
+                      child: const Text("Delete Recorded Vital"),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
