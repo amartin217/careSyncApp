@@ -1144,6 +1144,8 @@ Widget _buildCalendarHeader() {
                           final pickedTime = await showTimePicker(
                             context: context,
                             initialTime: selectedTime ?? TimeOfDay.now(),
+                            initialEntryMode:
+                                TimePickerEntryMode.input,
                           );
                           if (pickedTime != null) {
                             setModalState(() {
@@ -1287,6 +1289,8 @@ Widget _buildCalendarHeader() {
                         final pickedTime = await showTimePicker(
                           context: context,
                           initialTime: TimeOfDay.fromDateTime(selectedDateTime),
+                          initialEntryMode:
+                                TimePickerEntryMode.input,
                         );
                         if (pickedTime != null) {
                           setModalState(() {

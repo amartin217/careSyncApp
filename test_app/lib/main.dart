@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'pages/dashboard_page.dart';
 import 'pages/medication_page.dart';
 import 'pages/vitals_page.dart';
-// import 'pages/calendar_page_old.dart';
 import 'pages/calendar_page.dart';
 import 'pages/messaging_page.dart';
 import 'pages/link_patient_page.dart';
