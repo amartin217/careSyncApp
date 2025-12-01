@@ -11,6 +11,7 @@ import 'package:uuid/uuid.dart';
 
 import 'models/vital.dart'; // VitalType, VitalReading
 import '../widgets/profile_menu.dart';
+// import 'navigation/auth_gate.dart';
 
 
 Future<void> main() async {
