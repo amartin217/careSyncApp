@@ -573,6 +573,51 @@ class _VitalsPageState extends State<VitalsPage> {
   }
 }
 
+void _showVitalLogsDialog(BuildContext context, Vital vital) async {
+  final supabase = Supabase.instance.client;
+
+  // Fetch logs for this vital
+  final response = await supabase
+      .from('VitalLog')
+      .select()
+      .eq('vital_id', vital.id)
+      .order('datetime', ascending: false);
+
+  final logs = response as List<dynamic>;
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: Text("${vital.name} (${vital.units}) Logs"),
+        content: logs.isEmpty
+            ? const Text("No logs recorded yet.")
+            : SizedBox(
+                width: double.maxFinite,
+                child: ListView(
+                  shrinkWrap: true,
+                  children: logs.map((log) {
+                    final dt = DateTime.parse(log['datetime']).toLocal();
+                    final timestamp = "${dt.month}/${dt.day}/${dt.year} at ${TimeOfDay.fromDateTime(dt).format(context)}";
+                    return ListTile(
+                      title: Text("Value: ${log['value']} ${vital.units}"),
+                      subtitle: Text("Recorded on $timestamp\nNotes: ${log['notes'] ?? "none"}"),
+                    );
+                  }).toList(),
+                ),
+              ),
+        actions: [
+          TextButton(
+            child: const Text("Close"),
+            onPressed: () => Navigator.pop(context),
+          )
+        ],
+      );
+    },
+  );
+}
+
+
 // -----------------------------
 // TIMELINE VIEW (like Medication)
 // -----------------------------
@@ -1125,6 +1170,12 @@ class MyVitalsScreen extends StatelessWidget {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  TextButton(
+                    child: const Text("Logs"),
+                    onPressed: () {
+                      _showVitalLogsDialog(context, v);
+                    },
+                  ),
                   TextButton(
                     child: const Text("Edit"),
                     onPressed: () {
