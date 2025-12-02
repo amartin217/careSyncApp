@@ -597,7 +597,7 @@ void _showVitalLogsDialog(BuildContext context, Vital vital) async {
                 child: ListView(
                   shrinkWrap: true,
                   children: logs.map((log) {
-                    final dt = DateTime.parse(log['datetime']).toLocal();
+                    final dt = DateTime.parse(log['datetime']);
                     final timestamp = "${dt.month}/${dt.day}/${dt.year} at ${TimeOfDay.fromDateTime(dt).format(context)}";
                     return ListTile(
                       title: Text("Value: ${log['value']} ${vital.units}"),
@@ -1064,8 +1064,8 @@ class VitalTimeslotCard extends StatelessWidget {
               log != null ? "${log.value}" : "No value logged yet";
           final timeText = log != null
               ? TimeOfDay(
-                      hour: log.datetime.toLocal().hour,
-                      minute: log.datetime.toLocal().minute)
+                      hour: log.datetime.hour,
+                      minute: log.datetime.minute)
                   .format(context)
               : "";
           return Container(
