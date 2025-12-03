@@ -214,7 +214,7 @@ class _MessagingPageState extends State<MessagingPage> {
     return Scaffold(
       appBar: AppBar(
           automaticallyImplyLeading: false,
-          title: const Text("Messages"),
+          title: const Text("Group Message"),
           centerTitle: true,
           foregroundColor: Colors.white,
           titleTextStyle: const TextStyle(
