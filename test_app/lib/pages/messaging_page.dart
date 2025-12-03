@@ -46,11 +46,12 @@ class _MessagingPageState extends State<MessagingPage> {
         .eq('user_id', currentUser.id)
         .maybeSingle();
 
+    String curPatientId = "";
     if (relation == null) {
-      return;
-    } 
-
-    final curPatientId = relation['patient_id'];
+      curPatientId = currentUser.id;
+    } else {
+      curPatientId = relation['patient_id'];
+    }
 
     // 2. Load messages for this patient
     final response = await supabase
