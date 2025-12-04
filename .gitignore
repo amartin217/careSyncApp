@@ -1,0 +1,60 @@
+# Flutter & Dart
+.dart_tool/
+build/
+/.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.flutter-plugins-dependencies
+.packages
+pubspec.lock
+
+# Generated files
+.flutter-plugins
+.flutter-plugins-dependencies
+generated_plugin_registrant.dart
+
+# Android build
+android/.gradle
+android/app/build/
+**/gradle-wrapper.jar
+*.keystore
+local.properties
+
+# iOS
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/ephemeral/
+Runner/GeneratedPluginRegistrant.*
+Podfile.lock
+
+# VS Code
+.vscode/
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Logs
+.log
+
+# Others
+.packages
+.metadata
+
+# Flutter assets cache
+/.pub-cache
+
+# Flutter web builds
+web/build/
+
+# Sensitive files
+# (uncomment to ignore if present) - keep secrets out of the repo
+# secrets.json
