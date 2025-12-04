@@ -49,7 +49,7 @@ class CaregiverSupportApp extends StatelessWidget {
             color: Color(0xFF1E2D3D),
           ),
         ),
-        cardTheme: CardThemeData(
+        cardTheme: CardTheme(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),

@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import '../models/medication.dart';
 import '../models/timeslot.dart';
-import 'dart:math';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../widgets/profile_menu.dart';
 
 
 class MedicationPage extends StatefulWidget {
+  const MedicationPage({super.key});
+
   @override
   _MedicationPageState createState() => _MedicationPageState();
 }
@@ -222,8 +223,6 @@ class _MedicationPageState extends State<MedicationPage> {
 
   Future<void> _editMedication(String id, String name,  String dosage,  String notes, List<Timeslot> timeslotsForMed) async {
     final supabase = Supabase.instance.client;
-
-    // Convert List<Timeslot> -> List<String> (timeslot IDs)
     final timeslotIds = timeslotsForMed.map((t) => t.id).toList();
 
     try {
@@ -286,7 +285,7 @@ class _MedicationPageState extends State<MedicationPage> {
     } catch (error) {
       debugPrint('Failed to delete timeslot: $error');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to delete timeslot. Please try again.')),
+        const SnackBar(content: Text('Failed to delete timeslot. Please try again.')),
       );
     }
   }
@@ -433,7 +432,7 @@ class _MedicationPageState extends State<MedicationPage> {
           flexibleSpace: Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFF6C8DA7), Color(0xFF5C7C9D)], // same as Dashboard
+                colors: [Color(0xFF6C8DA7), Color(0xFF5C7C9D)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -444,7 +443,7 @@ class _MedicationPageState extends State<MedicationPage> {
               Tab(text: "Timeline"),
               Tab(text: "My Medications"),
             ],
-            indicatorColor: Colors.white, // white underline to match theme
+            indicatorColor: Colors.white,
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white70,
           ),
@@ -490,7 +489,7 @@ class MedicationTimelineScreen extends StatelessWidget {
   final void Function(String id, String label, TimeOfDay time, List<Medication> selectedMeds) editTimeslot;
   final Color Function(String medId) getMedColor;
 
-  MedicationTimelineScreen({
+  const MedicationTimelineScreen({super.key, 
     required this.medications,
     required this.timeslots,
     required this.toggleTaken,
@@ -503,7 +502,7 @@ class MedicationTimelineScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       children: [
   ...(
     timeslots.toList()
@@ -528,9 +527,9 @@ class MedicationTimelineScreen extends StatelessWidget {
       getMedColor: getMedColor,
     );
   }).toList(),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         ElevatedButton(
-        child: Text("+ Add Timeslot"),
+        child: const Text("+ Add Timeslot"),
         onPressed: () {
           String newLabel = "";
           TimeOfDay selectedTime = TimeOfDay.now();
@@ -541,7 +540,7 @@ class MedicationTimelineScreen extends StatelessWidget {
               return StatefulBuilder(
                 builder: (context, setStateDialog) {
                   return AlertDialog(
-                    title: Text("Add Timeslot"),
+                    title: const Text("Add Timeslot"),
                     content: SingleChildScrollView(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -626,7 +625,7 @@ class MedicationTimelineScreen extends StatelessWidget {
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: Text("Cancel"),
+                        child: const Text("Cancel"),
                       ),
                       ElevatedButton(
                         onPressed: () {
@@ -647,7 +646,7 @@ class MedicationTimelineScreen extends StatelessWidget {
                             );
                           }
                         },
-                        child: Text("Save"),
+                        child: const Text("Save"),
                       ),
                     ],
                   );
@@ -707,7 +706,7 @@ class TimeslotCard extends StatelessWidget {
                 ),
                 Text(
                   slot.time.format(context),
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.black,
                     fontSize: 16,
                   ),
@@ -938,6 +937,7 @@ class MyMedicationsScreen extends StatefulWidget {
   });
 
   @override
+  // ignore: library_private_types_in_public_api
   _MyMedicationsScreenState createState() => _MyMedicationsScreenState();
 }
 
@@ -948,12 +948,12 @@ class _MyMedicationsScreenState extends State<MyMedicationsScreen> {
   @override
 Widget build(BuildContext context) {
   return ListView(
-    padding: EdgeInsets.all(16),
+    padding: const EdgeInsets.all(16),
     children: [
       ...widget.medications.map((m) {
         final medColor = widget.getMedColor(m.id);
         return Container(
-          margin: EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
             color:  medColor.withOpacity(0.2),
             borderRadius: BorderRadius.circular(12),
@@ -962,7 +962,7 @@ Widget build(BuildContext context) {
           child: ListTile(
             title: Text(
               "${m.name} ${m.dosage}",
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             subtitle: Text("Notes: ${m.notes}"),
             trailing: Row(
@@ -977,10 +977,10 @@ Widget build(BuildContext context) {
                       ),
                     );
                   },
-                  child: Text("Details"),
+                  child: const Text("Details"),
                 ),
                 TextButton(
-                  child: Text("Edit"),
+                  child: const Text("Edit"),
                   onPressed: () {
                     List<Timeslot> tempSelectedSlots = widget.timeslots
                      .where((ts) => m.timeslotIds.contains(ts.id))
@@ -1007,28 +1007,28 @@ Widget build(BuildContext context) {
                                   children: [
                                     TextField(
                                       controller: nameController,
-                                      decoration: InputDecoration(labelText: "Name"),
+                                      decoration: const InputDecoration(labelText: "Name"),
                                       onChanged: (val) => name = val,
                                     ),
                                     TextField(
                                       controller: dosageController,
-                                      decoration: InputDecoration(labelText: "Dosage"),
+                                      decoration: const InputDecoration(labelText: "Dosage"),
                                       onChanged: (val) => dosage = val,
                                     ),
                                     TextField(
                                       controller: notesController,
-                                      decoration: InputDecoration(labelText: "Notes"),
+                                      decoration: const InputDecoration(labelText: "Notes"),
                                       onChanged: (val) => notes = val,
                                     ),
-                                    SizedBox(height: 12),
-                                    Text("Assign to Timeslots:"),
+                                    const SizedBox(height: 12),
+                                    const Text("Assign to Timeslots:"),
                                     Wrap(
                                       spacing: 6,
                                       children: widget.timeslots.map((slot) {
                                         final isSelected = tempSelectedSlots.contains(slot);
                                         return FilterChip(
                                           label: Text(
-                                            slot.label + " " + slot.time.format(context),
+                                            "${slot.label} ${slot.time.format(context)}",
                                             style: TextStyle(
                                               color: isSelected ? Colors.white : Colors.black,
                                             ),
@@ -1058,7 +1058,7 @@ Widget build(BuildContext context) {
                               actions: [
                                 TextButton(
                                     onPressed: () => Navigator.pop(context),
-                                    child: Text("Cancel")),
+                                    child: const Text("Cancel")),
                                 ElevatedButton(
                                   onPressed: () {
                                     final updatedName = nameController.text.trim();
@@ -1078,7 +1078,7 @@ Widget build(BuildContext context) {
                                       });
                                     }
                                   },
-                                  child: Text("Save"),
+                                  child: const Text("Save"),
                                 ),
                               ],
                             );
@@ -1093,25 +1093,25 @@ Widget build(BuildContext context) {
                     showDialog(
                       context: context,
                       builder: (ctx) => AlertDialog(
-                        title: Text("Delete Medication"),
+                        title: const Text("Delete Medication"),
                         content: Text("Are you sure you want to delete '${m.name}'?"),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(ctx),
-                            child: Text("Cancel"),
+                            child: const Text("Cancel"),
                           ),
                           ElevatedButton(
                             onPressed: () {
                               widget.deleteMedication(m.id);
                               Navigator.pop(ctx);
                             },
-                            child: Text("Delete"),
+                            child: const Text("Delete"),
                           ),
                         ],
                       ),
                     );
                   },
-                  child: Text(
+                  child: const Text(
                     "Delete",
                     style: TextStyle(color: Colors.red),
                   ),
@@ -1123,7 +1123,7 @@ Widget build(BuildContext context) {
       }).toList(),
 
       ElevatedButton(
-        child: Text("+ Add Medication"),
+        child: const Text("+ Add Medication"),
         onPressed: () {
           String name = "";
           String dosage = "";
@@ -1136,25 +1136,25 @@ Widget build(BuildContext context) {
               return StatefulBuilder(
                 builder: (context, setStateDialog) {
                   return AlertDialog(
-                    title: Text("Add Medication"),
+                    title: const Text("Add Medication"),
                     content: SingleChildScrollView(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           TextField(
-                            decoration: InputDecoration(labelText: "Name"),
+                            decoration: const InputDecoration(labelText: "Name"),
                             onChanged: (val) => name = val,
                           ),
                           TextField(
-                            decoration: InputDecoration(labelText: "Dosage"),
+                            decoration: const InputDecoration(labelText: "Dosage"),
                             onChanged: (val) => dosage = val,
                           ),
                           TextField(
-                            decoration: InputDecoration(labelText: "Notes"),
+                            decoration: const InputDecoration(labelText: "Notes"),
                             onChanged: (val) => notes = val,
                           ),
-                          SizedBox(height: 12),
-                          Text("Assign to Timeslots:"),
+                          const SizedBox(height: 12),
+                          const Text("Assign to Timeslots:"),
                           Wrap(
                             spacing: 6,
                             children: widget.timeslots.map((slot) {
@@ -1191,7 +1191,7 @@ Widget build(BuildContext context) {
                     actions: [
                       TextButton(
                           onPressed: () => Navigator.pop(context),
-                          child: Text("Cancel")),
+                          child: const Text("Cancel")),
                       ElevatedButton(
                         onPressed: () {
                           if (name.isNotEmpty &&
@@ -1211,7 +1211,7 @@ Widget build(BuildContext context) {
                             });
                           }
                         },
-                        child: Text("Save"),
+                        child: const Text("Save"),
                       ),
                     ],
                   );
@@ -1241,7 +1241,7 @@ class MedicationDetailPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(med.name)),
       body: ListView(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         children: [
           ExpansionTile(
             initiallyExpanded: true,
@@ -1250,7 +1250,7 @@ class MedicationDetailPage extends StatelessWidget {
               ListTile(title: Text("Dosage: ${med.dosage}")),
               ListTile(title: Text("Notes: ${med.notes}")),
               ListTile(
-                title: Text("Assigned Timeslots:"),
+                title: const Text("Assigned Timeslots:"),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: med.timeslotIds.map((id) {
